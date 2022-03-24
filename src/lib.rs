@@ -123,7 +123,6 @@
 
 mod constants;
 mod parse;
-mod utils;
 
 pub mod datetime;
 pub mod error;

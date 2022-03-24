@@ -1,8 +1,8 @@
 //! Functions used for parsing a TZ string.
 
+use super::Cursor;
 use crate::error::{TzError, TzStringError};
 use crate::timezone::*;
-use crate::utils::*;
 
 use std::num::ParseIntError;
 use std::str::{self, FromStr};

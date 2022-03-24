@@ -1,9 +1,9 @@
 //! Functions used for parsing a TZif file.
 
 use super::tz_string::parse_posix_tz;
+use super::Cursor;
 use crate::error::{TzError, TzFileError};
 use crate::timezone::*;
-use crate::utils::*;
 
 use std::convert::TryInto;
 use std::fs::File;
