@@ -14,8 +14,6 @@ use std::io::{self, Read};
 use std::str;
 use std::time::SystemTime;
 
-use const_fn::const_fn;
-
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Transition {
@@ -27,20 +25,17 @@ pub struct Transition {
 
 impl Transition {
     /// Construct a TZif file transition
-    #[const_fn(feature = "const")]
-    pub const fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
+    pub fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
         Self { unix_leap_time, local_time_type_index }
     }
 
     /// Returns Unix leap time
-    #[const_fn(feature = "const")]
-    pub const fn unix_leap_time(&self) -> i64 {
+    pub fn unix_leap_time(&self) -> i64 {
         self.unix_leap_time
     }
 
     /// Returns local time type index
-    #[const_fn(feature = "const")]
-    pub const fn local_time_type_index(&self) -> usize {
+    pub fn local_time_type_index(&self) -> usize {
         self.local_time_type_index
     }
 }
@@ -56,20 +51,17 @@ pub struct LeapSecond {
 
 impl LeapSecond {
     /// Construct a TZif file leap second
-    #[const_fn(feature = "const")]
-    pub const fn new(unix_leap_time: i64, correction: i32) -> Self {
+    pub fn new(unix_leap_time: i64, correction: i32) -> Self {
         Self { unix_leap_time, correction }
     }
 
     /// Returns Unix leap time
-    #[const_fn(feature = "const")]
-    pub const fn unix_leap_time(&self) -> i64 {
+    pub fn unix_leap_time(&self) -> i64 {
         self.unix_leap_time
     }
 
     /// Returns leap second correction
-    #[const_fn(feature = "const")]
-    pub const fn correction(&self) -> i32 {
+    pub fn correction(&self) -> i32 {
         self.correction
     }
 }
@@ -83,7 +75,6 @@ struct TzAsciiStr {
 
 impl TzAsciiStr {
     /// Construct a time zone designation string
-    #[const_fn(feature = "const")]
     const fn new(input: &[u8]) -> Result<Self, LocalTimeTypeError> {
         let len = input.len();
 
@@ -111,7 +102,6 @@ impl TzAsciiStr {
     }
 
     /// Returns time zone designation as a byte slice
-    #[const_fn(feature = "const")]
     const fn as_bytes(&self) -> &[u8] {
         match &self.bytes {
             [3, head @ .., _, _, _, _] => head,
@@ -124,14 +114,12 @@ impl TzAsciiStr {
     }
 
     /// Returns time zone designation as a string
-    #[const_fn(feature = "const")]
     const fn as_str(&self) -> &str {
         // SAFETY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.as_bytes()) }
     }
 
     /// Check if two time zone designations are equal
-    #[const_fn(feature = "const")]
     const fn equal(&self, other: &Self) -> bool {
         u64::from_ne_bytes(self.bytes) == u64::from_ne_bytes(other.bytes)
     }
@@ -156,8 +144,7 @@ pub struct LocalTimeType {
 
 impl LocalTimeType {
     /// Construct a local time type
-    #[const_fn(feature = "const")]
-    pub const fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<&[u8]>) -> Result<Self, LocalTimeTypeError> {
+    pub fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<&[u8]>) -> Result<Self, LocalTimeTypeError> {
         if ut_offset == i32::MIN {
             return Err(LocalTimeTypeError("invalid UTC offset"));
         }
@@ -179,8 +166,7 @@ impl LocalTimeType {
     }
 
     /// Construct a local time type with the specified UTC offset in seconds
-    #[const_fn(feature = "const")]
-    pub const fn with_ut_offset(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
+    pub fn with_ut_offset(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
         if ut_offset == i32::MIN {
             return Err(LocalTimeTypeError("invalid UTC offset"));
         }
@@ -189,20 +175,17 @@ impl LocalTimeType {
     }
 
     /// Returns offset from UTC in seconds
-    #[const_fn(feature = "const")]
-    pub const fn ut_offset(&self) -> i32 {
+    pub fn ut_offset(&self) -> i32 {
         self.ut_offset
     }
 
     /// Returns daylight saving time indicator
-    #[const_fn(feature = "const")]
-    pub const fn is_dst(&self) -> bool {
+    pub fn is_dst(&self) -> bool {
         self.is_dst
     }
 
     /// Returns time zone designation
-    #[const_fn(feature = "const")]
-    pub const fn time_zone_designation(&self) -> &str {
+    pub fn time_zone_designation(&self) -> &str {
         match &self.time_zone_designation {
             Some(s) => s.as_str(),
             None => "",
@@ -216,8 +199,7 @@ pub struct Julian1WithoutLeap(u16);
 
 impl Julian1WithoutLeap {
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
-    #[const_fn(feature = "const")]
-    pub const fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
+    pub fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
         if !(1 <= julian_day_1 && julian_day_1 <= 365) {
             return Err(TransitionRuleError("invalid rule day julian day"));
         }
@@ -226,8 +208,7 @@ impl Julian1WithoutLeap {
     }
 
     /// Returns inner value
-    #[const_fn(feature = "const")]
-    pub const fn get(&self) -> u16 {
+    pub fn get(&self) -> u16 {
         self.0
     }
 }
@@ -238,8 +219,7 @@ pub struct Julian0WithLeap(u16);
 
 impl Julian0WithLeap {
     /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
-    #[const_fn(feature = "const")]
-    pub const fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
+    pub fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
         if julian_day_0 > 365 {
             return Err(TransitionRuleError("invalid rule day julian day"));
         }
@@ -248,8 +228,7 @@ impl Julian0WithLeap {
     }
 
     /// Returns inner value
-    #[const_fn(feature = "const")]
-    pub const fn get(&self) -> u16 {
+    pub fn get(&self) -> u16 {
         self.0
     }
 }
@@ -267,8 +246,7 @@ pub struct MonthWeekDay {
 
 impl MonthWeekDay {
     /// Construct a transition rule day represented by a month, a month week and a week day
-    #[const_fn(feature = "const")]
-    pub const fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
+    pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
         if !(1 <= month && month <= 12) {
             return Err(TransitionRuleError("invalid rule day month"));
         }
@@ -285,20 +263,17 @@ impl MonthWeekDay {
     }
 
     /// Returns month in `[1, 12]`
-    #[const_fn(feature = "const")]
-    pub const fn month(&self) -> u8 {
+    pub fn month(&self) -> u8 {
         self.month
     }
 
     /// Returns week of the month in `[1, 5]`, with `5` representing the last week of the month
-    #[const_fn(feature = "const")]
-    pub const fn week(&self) -> u8 {
+    pub fn week(&self) -> u8 {
         self.week
     }
 
     /// Returns day of the week in `[0, 6]` from Sunday
-    #[const_fn(feature = "const")]
-    pub const fn week_day(&self) -> u8 {
+    pub fn week_day(&self) -> u8 {
         self.week_day
     }
 }
@@ -321,9 +296,7 @@ impl RuleDay {
     ///
     /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 31]`
-    ///
-    #[const_fn(feature = "const")]
-    const fn transition_date(&self, year: i32) -> (usize, i64) {
+    fn transition_date(&self, year: i32) -> (usize, i64) {
         use crate::constants::*;
 
         match *self {
@@ -380,8 +353,7 @@ impl RuleDay {
     }
 
     /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
-    #[const_fn(feature = "const")]
-    const fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
+    fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
         use crate::constants::*;
 
         let (month, month_day) = self.transition_date(year);
@@ -408,8 +380,7 @@ pub struct AlternateTime {
 
 impl AlternateTime {
     /// Construct a transition rule representing alternate local time types
-    #[const_fn(feature = "const")]
-    pub const fn new(
+    pub fn new(
         std: LocalTimeType,
         dst: LocalTimeType,
         dst_start: RuleDay,
@@ -430,44 +401,37 @@ impl AlternateTime {
 
 impl AlternateTime {
     /// Returns local time type for standard time
-    #[const_fn(feature = "const")]
-    pub const fn std(&self) -> &LocalTimeType {
+    pub fn std(&self) -> &LocalTimeType {
         &self.std
     }
 
     /// Returns local time type for Daylight Saving Time
-    #[const_fn(feature = "const")]
-    pub const fn dst(&self) -> &LocalTimeType {
+    pub fn dst(&self) -> &LocalTimeType {
         &self.dst
     }
 
     /// Returns start day of Daylight Saving Time
-    #[const_fn(feature = "const")]
-    pub const fn dst_start(&self) -> &RuleDay {
+    pub fn dst_start(&self) -> &RuleDay {
         &self.dst_start
     }
 
     /// Returns local start day time of Daylight Saving Time, in seconds
-    #[const_fn(feature = "const")]
-    pub const fn dst_start_time(&self) -> i32 {
+    pub fn dst_start_time(&self) -> i32 {
         self.dst_start_time
     }
 
     /// Returns end day of Daylight Saving Time
-    #[const_fn(feature = "const")]
-    pub const fn dst_end(&self) -> &RuleDay {
+    pub fn dst_end(&self) -> &RuleDay {
         &self.dst_end
     }
 
     /// Returns local end day time of Daylight Saving Time, in seconds
-    #[const_fn(feature = "const")]
-    pub const fn dst_end_time(&self) -> i32 {
+    pub fn dst_end_time(&self) -> i32 {
         self.dst_end_time
     }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
-    #[const_fn(feature = "const")]
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
         // Overflow is not possible
         let dst_start_time_in_utc = self.dst_start_time as i64 - self.std.ut_offset as i64;
         let dst_end_time_in_utc = self.dst_end_time as i64 - self.dst.ut_offset as i64;
@@ -550,8 +514,7 @@ pub enum TransitionRule {
 
 impl TransitionRule {
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
-    #[const_fn(feature = "const")]
-    const fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
@@ -587,8 +550,7 @@ pub struct TimeZoneRef<'a> {
 
 impl<'a> TimeZoneRef<'a> {
     /// Construct a time zone reference
-    #[const_fn(feature = "const")]
-    pub const fn new(
+    pub fn new(
         transitions: &'a [Transition],
         local_time_types: &'a [LocalTimeType],
         leap_seconds: &'a [LeapSecond],
@@ -604,39 +566,32 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Construct the time zone reference associated to UTC
-    #[const_fn(feature = "const")]
     pub const fn utc() -> Self {
-        const UTC: LocalTimeType = LocalTimeType::utc();
-        Self { transitions: &[], local_time_types: &[UTC], leap_seconds: &[], extra_rule: &None }
+        Self { transitions: &[], local_time_types: &[UTC_TYPE], leap_seconds: &[], extra_rule: &None }
     }
 
     /// Returns list of transitions
-    #[const_fn(feature = "const")]
-    pub const fn transitions(&self) -> &'a [Transition] {
+    pub fn transitions(&self) -> &'a [Transition] {
         self.transitions
     }
 
     /// Returns list of local time types
-    #[const_fn(feature = "const")]
-    pub const fn local_time_types(&self) -> &'a [LocalTimeType] {
+    pub fn local_time_types(&self) -> &'a [LocalTimeType] {
         self.local_time_types
     }
 
     /// Returns list of leap seconds
-    #[const_fn(feature = "const")]
-    pub const fn leap_seconds(&self) -> &'a [LeapSecond] {
+    pub fn leap_seconds(&self) -> &'a [LeapSecond] {
         self.leap_seconds
     }
 
     /// Returns extra transition rule applicable after the last transition
-    #[const_fn(feature = "const")]
-    pub const fn extra_rule(&self) -> &'a Option<TransitionRule> {
+    pub fn extra_rule(&self) -> &'a Option<TransitionRule> {
         self.extra_rule
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    #[const_fn(feature = "const")]
-    pub const fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
+    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
         let extra_rule = match self.transitions.last() {
             None => match self.extra_rule {
                 Some(extra_rule) => extra_rule,
@@ -672,7 +627,6 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Construct a reference to a time zone
-    #[const_fn(feature = "const")]
     const fn new_unchecked(
         transitions: &'a [Transition],
         local_time_types: &'a [LocalTimeType],
@@ -683,8 +637,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Check time zone inputs
-    #[const_fn(feature = "const")]
-    const fn check_inputs(&self) -> Result<(), TimeZoneError> {
+    fn check_inputs(&self) -> Result<(), TimeZoneError> {
         use crate::constants::*;
 
         // Check local time types
@@ -761,7 +714,6 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Convert Unix time to Unix leap time, from the list of leap seconds in a time zone
-    #[const_fn(feature = "const")]
     const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, OutOfRangeError> {
         let mut unix_leap_time = unix_time;
 
@@ -785,8 +737,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Convert Unix leap time to Unix time, from the list of leap seconds in a time zone
-    #[const_fn(feature = "const")]
-    const fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, OutOfRangeError> {
+    fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, OutOfRangeError> {
         if unix_leap_time == i64::MIN {
             return Err(OutOfRangeError("out of range operation"));
         }
@@ -804,6 +755,8 @@ impl<'a> TimeZoneRef<'a> {
         }
     }
 }
+
+const UTC_TYPE: LocalTimeType = LocalTimeType::utc();
 
 impl TimeZone {
     /// Construct a time zone

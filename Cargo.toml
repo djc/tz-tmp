@@ -12,10 +12,3 @@ readme = "README.md"
 
 [lib]
 name = "tz"
-
-[dependencies]
-const_fn = "0.4"
-
-[features]
-default = ["const"]
-const = []
