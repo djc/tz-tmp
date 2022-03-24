@@ -2,10 +2,9 @@
 
 use crate::error::*;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
-use crate::utils::*;
 
 use std::cmp::Ordering;
-use std::convert::TryInto;
+use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::time::SystemTime;
 
@@ -172,9 +171,9 @@ impl UtcDateTime {
         let minute = (remaining_seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
         let second = remaining_seconds % SECONDS_PER_MINUTE;
 
-        let year = match try_into_i32(year) {
+        let year = match i32::try_from(year) {
             Ok(year) => year,
-            Err(error) => return Err(error),
+            Err(_) => return Err(OutOfRangeError("i64 is out of range for i32")),
         };
 
         Ok(Self {
@@ -506,11 +505,11 @@ fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
 fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
     use crate::constants::*;
 
-    let unix_time = match try_into_i64(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128))
-    {
-        Ok(unix_time) => unix_time,
-        Err(error) => return Err(error),
-    };
+    let unix_time =
+        match i64::try_from(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
+            Ok(unix_time) => unix_time,
+            Err(_) => return Err(OutOfRangeError("cannot convert i128 to i64")),
+        };
 
     let nanoseconds = total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32;
 

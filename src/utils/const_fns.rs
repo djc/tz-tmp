@@ -1,31 +1,6 @@
 //! Some useful constant functions.
 
-use crate::error::OutOfRangeError;
 use crate::timezone::{LeapSecond, Transition};
-
-/// Macro for implementing integer conversion
-macro_rules! impl_try_into_integer {
-    ($from_type:ty, $to_type:ty, $value:expr) => {{
-        let min = <$to_type>::MIN as $from_type;
-        let max = <$to_type>::MAX as $from_type;
-
-        if min <= $value && $value <= max {
-            Ok($value as $to_type)
-        } else {
-            Err(OutOfRangeError("out of range integer conversion"))
-        }
-    }};
-}
-
-/// Convert a `i64` value to a `i32` value
-pub fn try_into_i32(value: i64) -> Result<i32, OutOfRangeError> {
-    impl_try_into_integer!(i64, i32, value)
-}
-
-/// Convert a `i128` value to a `i64` value
-pub fn try_into_i64(value: i128) -> Result<i64, OutOfRangeError> {
-    impl_try_into_integer!(i128, i64, value)
-}
 
 /// Macro for implementing binary search
 macro_rules! impl_binary_search {
