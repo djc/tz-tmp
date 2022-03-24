@@ -3,19 +3,6 @@
 use crate::error::OutOfRangeError;
 use crate::timezone::{LeapSecond, Transition};
 
-use std::cmp::Ordering;
-
-/// Compare two values
-pub fn cmp(a: i64, b: i64) -> Ordering {
-    if a < b {
-        Ordering::Less
-    } else if a == b {
-        Ordering::Equal
-    } else {
-        Ordering::Greater
-    }
-}
-
 /// Macro for implementing integer conversion
 macro_rules! impl_try_into_integer {
     ($from_type:ty, $to_type:ty, $value:expr) => {{

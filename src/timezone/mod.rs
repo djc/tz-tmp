@@ -476,58 +476,59 @@ impl AlternateTime {
             self.dst_end.unix_time(current_year, dst_end_time_in_utc);
 
         // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
-        let is_dst = match cmp(current_year_dst_start_unix_time, current_year_dst_end_unix_time) {
-            Ordering::Less | Ordering::Equal => {
-                if unix_time < current_year_dst_start_unix_time {
-                    let previous_year_dst_end_unix_time =
-                        self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
-                    if unix_time < previous_year_dst_end_unix_time {
-                        let previous_year_dst_start_unix_time =
-                            self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
-                        previous_year_dst_start_unix_time <= unix_time
-                    } else {
-                        false
-                    }
-                } else if unix_time < current_year_dst_end_unix_time {
-                    true
-                } else {
-                    let next_year_dst_start_unix_time =
-                        self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
-                    if next_year_dst_start_unix_time <= unix_time {
-                        let next_year_dst_end_unix_time =
-                            self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
-                        unix_time < next_year_dst_end_unix_time
-                    } else {
-                        false
-                    }
-                }
-            }
-            Ordering::Greater => {
-                if unix_time < current_year_dst_end_unix_time {
-                    let previous_year_dst_start_unix_time =
-                        self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
-                    if unix_time < previous_year_dst_start_unix_time {
+        let is_dst =
+            match Ord::cmp(&current_year_dst_start_unix_time, &current_year_dst_end_unix_time) {
+                Ordering::Less | Ordering::Equal => {
+                    if unix_time < current_year_dst_start_unix_time {
                         let previous_year_dst_end_unix_time =
                             self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
-                        unix_time < previous_year_dst_end_unix_time
-                    } else {
+                        if unix_time < previous_year_dst_end_unix_time {
+                            let previous_year_dst_start_unix_time =
+                                self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
+                            previous_year_dst_start_unix_time <= unix_time
+                        } else {
+                            false
+                        }
+                    } else if unix_time < current_year_dst_end_unix_time {
                         true
-                    }
-                } else if unix_time < current_year_dst_start_unix_time {
-                    false
-                } else {
-                    let next_year_dst_end_unix_time =
-                        self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
-                    if next_year_dst_end_unix_time <= unix_time {
+                    } else {
                         let next_year_dst_start_unix_time =
                             self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
-                        next_year_dst_start_unix_time <= unix_time
-                    } else {
-                        true
+                        if next_year_dst_start_unix_time <= unix_time {
+                            let next_year_dst_end_unix_time =
+                                self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
+                            unix_time < next_year_dst_end_unix_time
+                        } else {
+                            false
+                        }
                     }
                 }
-            }
-        };
+                Ordering::Greater => {
+                    if unix_time < current_year_dst_end_unix_time {
+                        let previous_year_dst_start_unix_time =
+                            self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
+                        if unix_time < previous_year_dst_start_unix_time {
+                            let previous_year_dst_end_unix_time =
+                                self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
+                            unix_time < previous_year_dst_end_unix_time
+                        } else {
+                            true
+                        }
+                    } else if unix_time < current_year_dst_start_unix_time {
+                        false
+                    } else {
+                        let next_year_dst_end_unix_time =
+                            self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
+                        if next_year_dst_end_unix_time <= unix_time {
+                            let next_year_dst_start_unix_time =
+                                self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
+                            next_year_dst_start_unix_time <= unix_time
+                        } else {
+                            true
+                        }
+                    }
+                }
+            };
 
         if is_dst {
             Ok(&self.dst)
