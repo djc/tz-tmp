@@ -134,13 +134,13 @@ impl UtcDateTime {
             cycles_400_years -= 1;
         }
 
-        let cycles_100_years = min(remaining_days / DAYS_PER_100_YEARS, 3);
+        let cycles_100_years = Ord::min(remaining_days / DAYS_PER_100_YEARS, 3);
         remaining_days -= cycles_100_years * DAYS_PER_100_YEARS;
 
-        let cycles_4_years = min(remaining_days / DAYS_PER_4_YEARS, 24);
+        let cycles_4_years = Ord::min(remaining_days / DAYS_PER_4_YEARS, 24);
         remaining_days -= cycles_4_years * DAYS_PER_4_YEARS;
 
-        let remaining_years = min(remaining_days / DAYS_PER_NORMAL_YEAR, 3);
+        let remaining_years = Ord::min(remaining_days / DAYS_PER_NORMAL_YEAR, 3);
         remaining_days -= remaining_years * DAYS_PER_NORMAL_YEAR;
 
         let mut year = OFFSET_YEAR

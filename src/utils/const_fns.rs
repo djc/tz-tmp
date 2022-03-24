@@ -16,14 +16,6 @@ pub fn cmp(a: i64, b: i64) -> Ordering {
     }
 }
 
-/// Returns the minimum of two values
-pub fn min(a: i64, b: i64) -> i64 {
-    match cmp(a, b) {
-        Ordering::Less | Ordering::Equal => a,
-        Ordering::Greater => b,
-    }
-}
-
 /// Macro for implementing integer conversion
 macro_rules! impl_try_into_integer {
     ($from_type:ty, $to_type:ty, $value:expr) => {{
