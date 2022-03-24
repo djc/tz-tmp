@@ -1,4 +1,4 @@
-fn main() -> tz::Result<()> {
+fn main() -> Result<(), tz::TzError> {
     #[cfg(feature = "const")]
     {
         use tz::datetime::*;

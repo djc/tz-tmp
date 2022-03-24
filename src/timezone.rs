@@ -949,10 +949,9 @@ impl TimeZone {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::Result;
 
     #[test]
-    fn test_tz_ascii_str() -> Result<()> {
+    fn test_tz_ascii_str() -> Result<(), crate::TzError> {
         assert!(matches!(TzAsciiStr::new(b""), Err(LocalTimeTypeError(_))));
         assert!(matches!(TzAsciiStr::new(b"1"), Err(LocalTimeTypeError(_))));
         assert!(matches!(TzAsciiStr::new(b"12"), Err(LocalTimeTypeError(_))));
@@ -971,7 +970,7 @@ mod test {
     }
 
     #[test]
-    fn test_rule_day() -> Result<()> {
+    fn test_rule_day() -> Result<(), crate::TzError> {
         let rule_day_j1 = RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(60)?);
         assert_eq!(rule_day_j1.transition_date(2000), (3, 1));
         assert_eq!(rule_day_j1.transition_date(2001), (3, 1));
@@ -992,7 +991,7 @@ mod test {
     }
 
     #[test]
-    fn test_transition_rule() -> Result<()> {
+    fn test_transition_rule() -> Result<(), crate::TzError> {
         let transition_rule_fixed = TransitionRule::Fixed(LocalTimeType::new(-36000, false, None)?);
         assert_eq!(transition_rule_fixed.find_local_time_type(0)?.ut_offset(), -36000);
 
@@ -1086,7 +1085,7 @@ mod test {
     }
 
     #[test]
-    fn test_transition_rule_overflow() -> Result<()> {
+    fn test_transition_rule_overflow() -> Result<(), crate::TzError> {
         let transition_rule_1 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-1, false, None)?,
             LocalTimeType::new(-1, true, None)?,
@@ -1121,7 +1120,7 @@ mod test {
     }
 
     #[test]
-    fn test_time_zone() -> Result<()> {
+    fn test_time_zone() -> Result<(), crate::TzError> {
         let utc = LocalTimeType::utc();
         let cet = LocalTimeType::with_ut_offset(3600)?;
 
@@ -1161,7 +1160,7 @@ mod test {
     }
 
     #[test]
-    fn test_time_zone_from_posix_tz() -> Result<()> {
+    fn test_time_zone_from_posix_tz() -> Result<(), crate::TzError> {
         #[cfg(unix)]
         {
             let time_zone_local = TimeZone::local()?;
@@ -1189,7 +1188,7 @@ mod test {
     }
 
     #[test]
-    fn test_leap_seconds() -> Result<()> {
+    fn test_leap_seconds() -> Result<(), crate::TzError> {
         let time_zone = TimeZone::new(
             Vec::new(),
             vec![LocalTimeType::new(0, false, Some(b"UTC"))?],
@@ -1240,7 +1239,7 @@ mod test {
     }
 
     #[test]
-    fn test_leap_seconds_overflow() -> Result<()> {
+    fn test_leap_seconds_overflow() -> Result<(), crate::TzError> {
         let time_zone_err = TimeZone::new(
             vec![Transition::new(i64::MIN, 0)],
             vec![LocalTimeType::utc()],

@@ -1,6 +1,6 @@
-use tz::*;
+use tz::{DateTime, TimeZone, TzError, UtcDateTime};
 
-fn main() -> Result<()> {
+fn main() -> Result<(), TzError> {
     //
     // TimeZone
     //

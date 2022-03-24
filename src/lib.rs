@@ -131,6 +131,3 @@ pub mod timezone;
 pub use datetime::{DateTime, UtcDateTime};
 pub use error::TzError;
 pub use timezone::{TimeZone, TimeZoneRef};
-
-/// Alias for [`std::result::Result`] with the crate unified error
-pub type Result<T> = std::result::Result<T, TzError>;
