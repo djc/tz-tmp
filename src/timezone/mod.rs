@@ -3,7 +3,6 @@
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::*;
 use crate::parse::*;
-use crate::utils::*;
 use crate::UtcDateTime;
 
 use std::cmp::Ordering;
@@ -309,8 +308,7 @@ impl RuleDay {
             Self::Julian1WithoutLeap(Julian1WithoutLeap(year_day)) => {
                 let year_day = year_day as i64;
 
-                let month = match binary_search_i64(&CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, year_day - 1)
-                {
+                let month = match CUMUL_DAY_IN_MONTHS_NORMAL_YEAR.binary_search(&(year_day - 1)) {
                     Ok(x) => x + 1,
                     Err(x) => x,
                 };
@@ -339,7 +337,7 @@ impl RuleDay {
 
                 let year_day = year_day as i64;
 
-                let month = match binary_search_i64(&cumul_day_in_months, year_day) {
+                let month = match cumul_day_in_months.binary_search(&year_day) {
                     Ok(x) => x + 1,
                     Err(x) => x,
                 };
@@ -657,7 +655,10 @@ impl<'a> TimeZoneRef<'a> {
                         }
                     }
                 } else {
-                    let index = match binary_search_transitions(self.transitions, unix_leap_time) {
+                    let index = match self
+                        .transitions
+                        .binary_search_by_key(&unix_leap_time, Transition::unix_leap_time)
+                    {
                         Ok(x) => x + 1,
                         Err(x) => x,
                     };
@@ -809,7 +810,10 @@ impl<'a> TimeZoneRef<'a> {
             return Err(OutOfRangeError("out of range operation"));
         }
 
-        let index = match binary_search_leap_seconds(self.leap_seconds, unix_leap_time - 1) {
+        let index = match self
+            .leap_seconds
+            .binary_search_by_key(&(unix_leap_time - 1), LeapSecond::unix_leap_time)
+        {
             Ok(x) => x + 1,
             Err(x) => x,
         };
