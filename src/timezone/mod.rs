@@ -79,7 +79,9 @@ impl TzAsciiStr {
         let len = input.len();
 
         if !(3 <= len && len <= 7) {
-            return Err(LocalTimeTypeError("time zone designation must have between 3 and 7 characters"));
+            return Err(LocalTimeTypeError(
+                "time zone designation must have between 3 and 7 characters",
+            ));
         }
 
         let mut bytes = [0; 8];
@@ -144,7 +146,11 @@ pub struct LocalTimeType {
 
 impl LocalTimeType {
     /// Construct a local time type
-    pub fn new(ut_offset: i32, is_dst: bool, time_zone_designation: Option<&[u8]>) -> Result<Self, LocalTimeTypeError> {
+    pub fn new(
+        ut_offset: i32,
+        is_dst: bool,
+        time_zone_designation: Option<&[u8]>,
+    ) -> Result<Self, LocalTimeTypeError> {
         if ut_offset == i32::MIN {
             return Err(LocalTimeTypeError("invalid UTC offset"));
         }
@@ -303,7 +309,8 @@ impl RuleDay {
             Self::Julian1WithoutLeap(Julian1WithoutLeap(year_day)) => {
                 let year_day = year_day as i64;
 
-                let month = match binary_search_i64(&CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, year_day - 1) {
+                let month = match binary_search_i64(&CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, year_day - 1)
+                {
                     Ok(x) => x + 1,
                     Err(x) => x,
                 };
@@ -315,8 +322,20 @@ impl RuleDay {
             Self::Julian0WithLeap(Julian0WithLeap(year_day)) => {
                 let leap = is_leap_year(year) as i64;
 
-                let cumul_day_in_months =
-                    [0, 31, 59 + leap, 90 + leap, 120 + leap, 151 + leap, 181 + leap, 212 + leap, 243 + leap, 273 + leap, 304 + leap, 334 + leap];
+                let cumul_day_in_months = [
+                    0,
+                    31,
+                    59 + leap,
+                    90 + leap,
+                    120 + leap,
+                    151 + leap,
+                    181 + leap,
+                    212 + leap,
+                    243 + leap,
+                    273 + leap,
+                    304 + leap,
+                    334 + leap,
+                ];
 
                 let year_day = year_day as i64;
 
@@ -339,10 +358,13 @@ impl RuleDay {
                     day_in_month += leap;
                 }
 
-                let week_day_of_first_month_day = (4 + days_since_unix_epoch(year, month, 1)).rem_euclid(DAYS_PER_WEEK);
-                let first_week_day_occurence_in_month = 1 + (week_day as i64 - week_day_of_first_month_day).rem_euclid(DAYS_PER_WEEK);
+                let week_day_of_first_month_day =
+                    (4 + days_since_unix_epoch(year, month, 1)).rem_euclid(DAYS_PER_WEEK);
+                let first_week_day_occurence_in_month =
+                    1 + (week_day as i64 - week_day_of_first_month_day).rem_euclid(DAYS_PER_WEEK);
 
-                let mut month_day = first_week_day_occurence_in_month + (week as i64 - 1) * DAYS_PER_WEEK;
+                let mut month_day =
+                    first_week_day_occurence_in_month + (week as i64 - 1) * DAYS_PER_WEEK;
                 if month_day > day_in_month {
                     month_day -= DAYS_PER_WEEK
                 }
@@ -391,7 +413,9 @@ impl AlternateTime {
         use crate::constants::*;
 
         // Overflow is not possible
-        if !((dst_start_time as i64).abs() < SECONDS_PER_WEEK && (dst_end_time as i64).abs() < SECONDS_PER_WEEK) {
+        if !((dst_start_time as i64).abs() < SECONDS_PER_WEEK
+            && (dst_end_time as i64).abs() < SECONDS_PER_WEEK)
+        {
             return Err(TransitionRuleError("invalid DST start or end time"));
         }
 
@@ -446,16 +470,20 @@ impl AlternateTime {
             return Err(OutOfRangeError("out of range date time"));
         }
 
-        let current_year_dst_start_unix_time = self.dst_start.unix_time(current_year, dst_start_time_in_utc);
-        let current_year_dst_end_unix_time = self.dst_end.unix_time(current_year, dst_end_time_in_utc);
+        let current_year_dst_start_unix_time =
+            self.dst_start.unix_time(current_year, dst_start_time_in_utc);
+        let current_year_dst_end_unix_time =
+            self.dst_end.unix_time(current_year, dst_end_time_in_utc);
 
         // Check DST start/end Unix times for previous/current/next years to support for transition day times outside of [0h, 24h] range
         let is_dst = match cmp(current_year_dst_start_unix_time, current_year_dst_end_unix_time) {
             Ordering::Less | Ordering::Equal => {
                 if unix_time < current_year_dst_start_unix_time {
-                    let previous_year_dst_end_unix_time = self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
+                    let previous_year_dst_end_unix_time =
+                        self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
                     if unix_time < previous_year_dst_end_unix_time {
-                        let previous_year_dst_start_unix_time = self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
+                        let previous_year_dst_start_unix_time =
+                            self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
                         previous_year_dst_start_unix_time <= unix_time
                     } else {
                         false
@@ -463,9 +491,11 @@ impl AlternateTime {
                 } else if unix_time < current_year_dst_end_unix_time {
                     true
                 } else {
-                    let next_year_dst_start_unix_time = self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
+                    let next_year_dst_start_unix_time =
+                        self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
                     if next_year_dst_start_unix_time <= unix_time {
-                        let next_year_dst_end_unix_time = self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
+                        let next_year_dst_end_unix_time =
+                            self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
                         unix_time < next_year_dst_end_unix_time
                     } else {
                         false
@@ -474,9 +504,11 @@ impl AlternateTime {
             }
             Ordering::Greater => {
                 if unix_time < current_year_dst_end_unix_time {
-                    let previous_year_dst_start_unix_time = self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
+                    let previous_year_dst_start_unix_time =
+                        self.dst_start.unix_time(current_year - 1, dst_start_time_in_utc);
                     if unix_time < previous_year_dst_start_unix_time {
-                        let previous_year_dst_end_unix_time = self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
+                        let previous_year_dst_end_unix_time =
+                            self.dst_end.unix_time(current_year - 1, dst_end_time_in_utc);
                         unix_time < previous_year_dst_end_unix_time
                     } else {
                         true
@@ -484,9 +516,11 @@ impl AlternateTime {
                 } else if unix_time < current_year_dst_start_unix_time {
                     false
                 } else {
-                    let next_year_dst_end_unix_time = self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
+                    let next_year_dst_end_unix_time =
+                        self.dst_end.unix_time(current_year + 1, dst_end_time_in_utc);
                     if next_year_dst_end_unix_time <= unix_time {
-                        let next_year_dst_start_unix_time = self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
+                        let next_year_dst_start_unix_time =
+                            self.dst_start.unix_time(current_year + 1, dst_start_time_in_utc);
                         next_year_dst_start_unix_time <= unix_time
                     } else {
                         true
@@ -556,7 +590,8 @@ impl<'a> TimeZoneRef<'a> {
         leap_seconds: &'a [LeapSecond],
         extra_rule: &'a Option<TransitionRule>,
     ) -> Result<Self, TimeZoneError> {
-        let time_zone_ref = Self::new_unchecked(transitions, local_time_types, leap_seconds, extra_rule);
+        let time_zone_ref =
+            Self::new_unchecked(transitions, local_time_types, leap_seconds, extra_rule);
 
         if let Err(error) = time_zone_ref.check_inputs() {
             return Err(error);
@@ -567,7 +602,12 @@ impl<'a> TimeZoneRef<'a> {
 
     /// Construct the time zone reference associated to UTC
     pub const fn utc() -> Self {
-        Self { transitions: &[], local_time_types: &[UTC_TYPE], leap_seconds: &[], extra_rule: &None }
+        Self {
+            transitions: &[],
+            local_time_types: &[UTC_TYPE],
+            leap_seconds: &[],
+            extra_rule: &None,
+        }
     }
 
     /// Returns list of transitions
@@ -591,7 +631,10 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
+    pub fn find_local_time_type(
+        &self,
+        unix_time: i64,
+    ) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
         let extra_rule = match self.transitions.last() {
             None => match self.extra_rule {
                 Some(extra_rule) => extra_rule,
@@ -606,7 +649,11 @@ impl<'a> TimeZoneRef<'a> {
                 if unix_leap_time >= last_transition.unix_leap_time {
                     match self.extra_rule {
                         Some(extra_rule) => extra_rule,
-                        None => return Err(FindLocalTimeTypeError("no local time type is available for the specified timestamp")),
+                        None => {
+                            return Err(FindLocalTimeTypeError(
+                                "no local time type is available for the specified timestamp",
+                            ))
+                        }
                     }
                 } else {
                     let index = match binary_search_transitions(self.transitions, unix_leap_time) {
@@ -614,7 +661,11 @@ impl<'a> TimeZoneRef<'a> {
                         Err(x) => x,
                     };
 
-                    let local_time_type_index = if index > 0 { self.transitions[index - 1].local_time_type_index } else { 0 };
+                    let local_time_type_index = if index > 0 {
+                        self.transitions[index - 1].local_time_type_index
+                    } else {
+                        0
+                    };
                     return Ok(&self.local_time_types[local_time_type_index]);
                 }
             }
@@ -653,7 +704,10 @@ impl<'a> TimeZoneRef<'a> {
                 return Err(TimeZoneError("invalid local time type index"));
             }
 
-            if i_transition + 1 < self.transitions.len() && self.transitions[i_transition].unix_leap_time >= self.transitions[i_transition + 1].unix_leap_time {
+            if i_transition + 1 < self.transitions.len()
+                && self.transitions[i_transition].unix_leap_time
+                    >= self.transitions[i_transition + 1].unix_leap_time
+            {
                 return Err(TimeZoneError("invalid transition"));
             }
 
@@ -661,7 +715,10 @@ impl<'a> TimeZoneRef<'a> {
         }
 
         // Check leap seconds
-        if !(self.leap_seconds.is_empty() || self.leap_seconds[0].unix_leap_time >= 0 && self.leap_seconds[0].correction.saturating_abs() == 1) {
+        if !(self.leap_seconds.is_empty()
+            || self.leap_seconds[0].unix_leap_time >= 0
+                && self.leap_seconds[0].correction.saturating_abs() == 1)
+        {
             return Err(TimeZoneError("invalid leap second"));
         }
 
@@ -674,7 +731,8 @@ impl<'a> TimeZoneRef<'a> {
                 let x1 = &self.leap_seconds[i_leap_second + 1];
 
                 let diff_unix_leap_time = x1.unix_leap_time.saturating_sub(x0.unix_leap_time);
-                let abs_diff_correction = x1.correction.saturating_sub(x0.correction).saturating_abs();
+                let abs_diff_correction =
+                    x1.correction.saturating_sub(x0.correction).saturating_abs();
 
                 if !(diff_unix_leap_time >= min_interval && abs_diff_correction == 1) {
                     return Err(TimeZoneError("invalid leap second"));
@@ -684,8 +742,11 @@ impl<'a> TimeZoneRef<'a> {
         }
 
         // Check extra rule
-        if let (Some(extra_rule), Some(last_transition)) = (&self.extra_rule, self.transitions.last()) {
-            let last_local_time_type = &self.local_time_types[last_transition.local_time_type_index];
+        if let (Some(extra_rule), Some(last_transition)) =
+            (&self.extra_rule, self.transitions.last())
+        {
+            let last_local_time_type =
+                &self.local_time_types[last_transition.local_time_type_index];
 
             let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
                 Ok(unix_time) => unix_time,
@@ -699,14 +760,19 @@ impl<'a> TimeZoneRef<'a> {
 
             let check = last_local_time_type.ut_offset == rule_local_time_type.ut_offset
                 && last_local_time_type.is_dst == rule_local_time_type.is_dst
-                && match (&last_local_time_type.time_zone_designation, &rule_local_time_type.time_zone_designation) {
+                && match (
+                    &last_local_time_type.time_zone_designation,
+                    &rule_local_time_type.time_zone_designation,
+                ) {
                     (Some(x), Some(y)) => x.equal(y),
                     (None, None) => true,
                     _ => false,
                 };
 
             if !check {
-                return Err(TimeZoneError("extra transition rule is inconsistent with the last transition"));
+                return Err(TimeZoneError(
+                    "extra transition rule is inconsistent with the last transition",
+                ));
             }
         }
 
@@ -766,23 +832,39 @@ impl TimeZone {
         leap_seconds: Vec<LeapSecond>,
         extra_rule: Option<TransitionRule>,
     ) -> Result<Self, TimeZoneError> {
-        TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule).check_inputs()?;
+        TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule)
+            .check_inputs()?;
         Ok(Self { transitions, local_time_types, leap_seconds, extra_rule })
     }
 
     /// Returns a reference to the time zone
     pub fn as_ref(&self) -> TimeZoneRef {
-        TimeZoneRef::new_unchecked(&self.transitions, &self.local_time_types, &self.leap_seconds, &self.extra_rule)
+        TimeZoneRef::new_unchecked(
+            &self.transitions,
+            &self.local_time_types,
+            &self.leap_seconds,
+            &self.extra_rule,
+        )
     }
 
     /// Construct the time zone associated to UTC
     pub fn utc() -> Self {
-        Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::utc()], leap_seconds: Vec::new(), extra_rule: None }
+        Self {
+            transitions: Vec::new(),
+            local_time_types: vec![LocalTimeType::utc()],
+            leap_seconds: Vec::new(),
+            extra_rule: None,
+        }
     }
 
     /// Construct a time zone with the specified UTC offset in seconds
     pub fn fixed(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
-        Ok(Self { transitions: Vec::new(), local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?], leap_seconds: Vec::new(), extra_rule: None })
+        Ok(Self {
+            transitions: Vec::new(),
+            local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?],
+            leap_seconds: Vec::new(),
+            extra_rule: None,
+        })
     }
 
     /// Returns local time zone.
@@ -845,11 +927,16 @@ impl TimeZone {
 
     /// Find the current local time type associated to the time zone
     pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        Ok(self.find_local_time_type(SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?)?)
+        Ok(self.find_local_time_type(
+            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?,
+        )?)
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
+    pub fn find_local_time_type(
+        &self,
+        unix_time: i64,
+    ) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
         self.as_ref().find_local_time_type(unix_time)
     }
 }
@@ -955,10 +1042,22 @@ mod test {
             -3600,
         )?);
 
-        assert_eq!(transition_rule_negative_time_2.find_local_time_type(954032399)?.ut_offset(), -10800);
-        assert_eq!(transition_rule_negative_time_2.find_local_time_type(954032400)?.ut_offset(), -7200);
-        assert_eq!(transition_rule_negative_time_2.find_local_time_type(972781199)?.ut_offset(), -7200);
-        assert_eq!(transition_rule_negative_time_2.find_local_time_type(972781200)?.ut_offset(), -10800);
+        assert_eq!(
+            transition_rule_negative_time_2.find_local_time_type(954032399)?.ut_offset(),
+            -10800
+        );
+        assert_eq!(
+            transition_rule_negative_time_2.find_local_time_type(954032400)?.ut_offset(),
+            -7200
+        );
+        assert_eq!(
+            transition_rule_negative_time_2.find_local_time_type(972781199)?.ut_offset(),
+            -7200
+        );
+        assert_eq!(
+            transition_rule_negative_time_2.find_local_time_type(972781200)?.ut_offset(),
+            -10800
+        );
 
         let transition_rule_all_year_dst = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-18000, false, Some(b"EST"))?,
@@ -969,8 +1068,14 @@ mod test {
             90000,
         )?);
 
-        assert_eq!(transition_rule_all_year_dst.find_local_time_type(946702799)?.ut_offset(), -14400);
-        assert_eq!(transition_rule_all_year_dst.find_local_time_type(946702800)?.ut_offset(), -14400);
+        assert_eq!(
+            transition_rule_all_year_dst.find_local_time_type(946702799)?.ut_offset(),
+            -14400
+        );
+        assert_eq!(
+            transition_rule_all_year_dst.find_local_time_type(946702800)?.ut_offset(),
+            -14400
+        );
 
         Ok(())
     }
@@ -998,8 +1103,14 @@ mod test {
         let min_unix_time = -67768100567971200;
         let max_unix_time = 67767976233532799;
 
-        assert!(matches!(transition_rule_1.find_local_time_type(min_unix_time), Err(OutOfRangeError(_))));
-        assert!(matches!(transition_rule_2.find_local_time_type(max_unix_time), Err(OutOfRangeError(_))));
+        assert!(matches!(
+            transition_rule_1.find_local_time_type(min_unix_time),
+            Err(OutOfRangeError(_))
+        ));
+        assert!(matches!(
+            transition_rule_2.find_local_time_type(max_unix_time),
+            Err(OutOfRangeError(_))
+        ));
 
         Ok(())
     }
@@ -1013,9 +1124,16 @@ mod test {
         let fixed_extra_rule = TransitionRule::Fixed(cet);
 
         let time_zone_1 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], None)?;
-        let time_zone_2 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], Some(fixed_extra_rule))?;
-        let time_zone_3 = TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types.clone(), vec![], None)?;
-        let time_zone_4 = TimeZone::new(vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)], vec![utc, cet], Vec::new(), Some(fixed_extra_rule))?;
+        let time_zone_2 =
+            TimeZone::new(vec![], utc_local_time_types.clone(), vec![], Some(fixed_extra_rule))?;
+        let time_zone_3 =
+            TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types.clone(), vec![], None)?;
+        let time_zone_4 = TimeZone::new(
+            vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)],
+            vec![utc, cet],
+            Vec::new(),
+            Some(fixed_extra_rule),
+        )?;
 
         assert_eq!(*time_zone_1.find_local_time_type(0)?, utc);
         assert_eq!(*time_zone_2.find_local_time_type(0)?, cet);
@@ -1026,7 +1144,12 @@ mod test {
         assert_eq!(*time_zone_4.find_local_time_type(-1)?, utc);
         assert_eq!(*time_zone_4.find_local_time_type(0)?, cet);
 
-        let time_zone_err = TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types, vec![], Some(fixed_extra_rule));
+        let time_zone_err = TimeZone::new(
+            vec![Transition::new(0, 0)],
+            utc_local_time_types,
+            vec![],
+            Some(fixed_extra_rule),
+        );
         assert!(time_zone_err.is_err());
 
         Ok(())
@@ -1045,7 +1168,10 @@ mod test {
             assert_eq!(time_zone_local, time_zone_local_2);
             assert_eq!(time_zone_local, time_zone_local_3);
 
-            assert!(matches!(time_zone_local.find_current_local_time_type(), Ok(_) | Err(TzError::FindLocalTimeTypeError(_))));
+            assert!(matches!(
+                time_zone_local.find_current_local_time_type(),
+                Ok(_) | Err(TzError::FindLocalTimeTypeError(_))
+            ));
 
             let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
             assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
@@ -1118,7 +1244,12 @@ mod test {
         );
         assert!(time_zone_err.is_err());
 
-        let time_zone = TimeZone::new(vec![Transition::new(i64::MAX, 0)], vec![LocalTimeType::utc()], vec![LeapSecond::new(0, 1)], None)?;
+        let time_zone = TimeZone::new(
+            vec![Transition::new(i64::MAX, 0)],
+            vec![LocalTimeType::utc()],
+            vec![LeapSecond::new(0, 1)],
+            None,
+        )?;
         assert!(matches!(time_zone.find_local_time_type(i64::MAX), Err(FindLocalTimeTypeError(_))));
 
         Ok(())

@@ -30,7 +30,17 @@ pub struct UtcDateTime {
 
 impl fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        format_date_time(f, self.year, self.month, self.month_day, self.hour, self.minute, self.second, self.nanoseconds, 0)
+        format_date_time(
+            f,
+            self.year,
+            self.month,
+            self.month_day,
+            self.hour,
+            self.minute,
+            self.second,
+            self.nanoseconds,
+            0,
+        )
     }
 }
 
@@ -46,11 +56,25 @@ impl UtcDateTime {
     /// * `minute`: Minutes in `[0, 59]`
     /// * `second`: Seconds in `[0, 60]`, with a possible leap second
     /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
-    pub fn new(year: i32, month: u8, month_day: u8, hour: u8, minute: u8, second: u8, nanoseconds: u32) -> Result<Self, DateTimeError> {
+    pub fn new(
+        year: i32,
+        month: u8,
+        month_day: u8,
+        hour: u8,
+        minute: u8,
+        second: u8,
+        nanoseconds: u32,
+    ) -> Result<Self, DateTimeError> {
         use crate::constants::*;
 
         // Exclude the maximum possible UTC date time with a leap second
-        if year == i32::MAX && month == 12 && month_day == 31 && hour == 23 && minute == 59 && second == 60 {
+        if year == i32::MAX
+            && month == 12
+            && month_day == 31
+            && hour == 23
+            && minute == 59
+            && second == 60
+        {
             return Err(DateTimeError("out of range date time"));
         }
 
@@ -119,7 +143,11 @@ impl UtcDateTime {
         let remaining_years = min(remaining_days / DAYS_PER_NORMAL_YEAR, 3);
         remaining_days -= remaining_years * DAYS_PER_NORMAL_YEAR;
 
-        let mut year = OFFSET_YEAR + remaining_years + cycles_4_years * 4 + cycles_100_years * 100 + cycles_400_years * 400;
+        let mut year = OFFSET_YEAR
+            + remaining_years
+            + cycles_4_years * 4
+            + cycles_100_years * 100
+            + cycles_400_years * 400;
 
         let mut month = 0;
         while month < DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH.len() {
@@ -149,7 +177,15 @@ impl UtcDateTime {
             Err(error) => return Err(error),
         };
 
-        Ok(Self { year, month: month as u8, month_day: month_day as u8, hour: hour as u8, minute: minute as u8, second: second as u8, nanoseconds })
+        Ok(Self {
+            year,
+            month: month as u8,
+            month_day: month_day as u8,
+            hour: hour as u8,
+            minute: minute as u8,
+            second: second as u8,
+            nanoseconds,
+        })
     }
 
     /// Construct a UTC date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
@@ -170,7 +206,8 @@ impl UtcDateTime {
     pub fn unix_time(&self) -> i64 {
         use crate::constants::*;
 
-        let mut result = days_since_unix_epoch(self.year, self.month as usize, self.month_day as i64);
+        let mut result =
+            days_since_unix_epoch(self.year, self.month as usize, self.month_day as i64);
         result *= HOURS_PER_DAY;
         result += self.hour as i64;
         result *= MINUTES_PER_HOUR;
@@ -227,36 +264,68 @@ impl PartialOrd for DateTime {
 impl fmt::Display for DateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         let ut_offset = self.local_time_type().ut_offset();
-        format_date_time(f, self.year, self.month, self.month_day, self.hour, self.minute, self.second, self.nanoseconds, ut_offset)
+        format_date_time(
+            f,
+            self.year,
+            self.month,
+            self.month_day,
+            self.hour,
+            self.minute,
+            self.second,
+            self.nanoseconds,
+            ut_offset,
+        )
     }
 }
 
 impl DateTime {
     /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
-    pub fn from_timespec(unix_time: i64, nanoseconds: u32, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    pub fn from_timespec(
+        unix_time: i64,
+        nanoseconds: u32,
+        time_zone_ref: TimeZoneRef,
+    ) -> Result<Self, ProjectDateTimeError> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
             Ok(&local_time_type) => local_time_type,
             Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
         };
 
-        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64) {
+        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64)
+        {
             Some(unix_time_with_offset) => unix_time_with_offset,
             None => return Err(ProjectDateTimeError("out of range date time")),
         };
 
-        let utc_date_time_with_offset = match UtcDateTime::from_timespec(unix_time_with_offset, nanoseconds) {
-            Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
-            Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
-        };
+        let utc_date_time_with_offset =
+            match UtcDateTime::from_timespec(unix_time_with_offset, nanoseconds) {
+                Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
+                Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
+            };
 
-        let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } = utc_date_time_with_offset;
-        Ok(Self { year, month, month_day, hour, minute, second, local_time_type, unix_time, nanoseconds })
+        let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } =
+            utc_date_time_with_offset;
+        Ok(Self {
+            year,
+            month,
+            month_day,
+            hour,
+            minute,
+            second,
+            local_time_type,
+            unix_time,
+            nanoseconds,
+        })
     }
 
     /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
-    pub fn from_total_nanoseconds(total_nanoseconds: i128, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    pub fn from_total_nanoseconds(
+        total_nanoseconds: i128,
+        time_zone_ref: TimeZoneRef,
+    ) -> Result<Self, ProjectDateTimeError> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
-            Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds, time_zone_ref),
+            Ok((unix_time, nanoseconds)) => {
+                Self::from_timespec(unix_time, nanoseconds, time_zone_ref)
+            }
             Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
         }
     }
@@ -437,7 +506,8 @@ fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
 fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
     use crate::constants::*;
 
-    let unix_time = match try_into_i64(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
+    let unix_time = match try_into_i64(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128))
+    {
         Ok(unix_time) => unix_time,
         Err(error) => return Err(error),
     };
@@ -475,7 +545,11 @@ fn format_date_time(
 ) -> fmt::Result {
     use crate::constants::*;
 
-    write!(f, "{}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}", year, month, month_day, hour, minute, second, nanoseconds)?;
+    write!(
+        f,
+        "{}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",
+        year, month, month_day, hour, minute, second, nanoseconds
+    )?;
 
     if ut_offset != 0 {
         let ut_offset = ut_offset as i64;
@@ -604,11 +678,19 @@ mod test {
         ];
 
         for ((((&unix_time, &nanoseconds), date_time_utc), date_time_cet), date_time_eet) in
-            unix_times.iter().zip(nanoseconds_list).zip(date_times_utc).zip(date_times_cet).zip(date_times_eet)
+            unix_times
+                .iter()
+                .zip(nanoseconds_list)
+                .zip(date_times_utc)
+                .zip(date_times_cet)
+                .zip(date_times_eet)
         {
             let utc_date_time = UtcDateTime::from_timespec(unix_time, nanoseconds)?;
 
-            assert_eq!(UtcDateTime::from_timespec(utc_date_time.unix_time(), nanoseconds)?, utc_date_time);
+            assert_eq!(
+                UtcDateTime::from_timespec(utc_date_time.unix_time(), nanoseconds)?,
+                utc_date_time
+            );
 
             assert_eq!(utc_date_time.year(), date_time_utc.year());
             assert_eq!(utc_date_time.month(), date_time_utc.month());
@@ -650,7 +732,10 @@ mod test {
     fn test_date_time_leap_seconds() -> Result<()> {
         let utc_date_time = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
 
-        assert_eq!(UtcDateTime::from_timespec(utc_date_time.unix_time(), 1000)?, UtcDateTime::new(1972, 7, 1, 0, 0, 0, 1000)?);
+        assert_eq!(
+            UtcDateTime::from_timespec(utc_date_time.unix_time(), 1000)?,
+            UtcDateTime::new(1972, 7, 1, 0, 0, 0, 1000)?
+        );
 
         let date_time = utc_date_time.project(TimeZone::fixed(-3600)?.as_ref())?;
 
@@ -765,19 +850,49 @@ mod test {
         assert_eq!(utc_date_time_4.cmp(&utc_date_time_3), Ordering::Greater);
         assert_eq!(utc_date_time_4.cmp(&utc_date_time_4), Ordering::Equal);
 
-        assert_eq!(utc_date_time_1.cmp(&utc_date_time_1), utc_date_time_1.unix_time().cmp(&utc_date_time_1.unix_time()));
-        assert_eq!(utc_date_time_1.cmp(&utc_date_time_2), utc_date_time_1.unix_time().cmp(&utc_date_time_2.unix_time()));
-        assert_eq!(utc_date_time_1.cmp(&utc_date_time_3), utc_date_time_1.unix_time().cmp(&utc_date_time_3.unix_time()));
-        assert_eq!(utc_date_time_1.cmp(&utc_date_time_4), utc_date_time_1.unix_time().cmp(&utc_date_time_4.unix_time()));
+        assert_eq!(
+            utc_date_time_1.cmp(&utc_date_time_1),
+            utc_date_time_1.unix_time().cmp(&utc_date_time_1.unix_time())
+        );
+        assert_eq!(
+            utc_date_time_1.cmp(&utc_date_time_2),
+            utc_date_time_1.unix_time().cmp(&utc_date_time_2.unix_time())
+        );
+        assert_eq!(
+            utc_date_time_1.cmp(&utc_date_time_3),
+            utc_date_time_1.unix_time().cmp(&utc_date_time_3.unix_time())
+        );
+        assert_eq!(
+            utc_date_time_1.cmp(&utc_date_time_4),
+            utc_date_time_1.unix_time().cmp(&utc_date_time_4.unix_time())
+        );
 
-        assert_eq!(utc_date_time_2.cmp(&utc_date_time_1), utc_date_time_2.unix_time().cmp(&utc_date_time_1.unix_time()));
-        assert_eq!(utc_date_time_2.cmp(&utc_date_time_2), utc_date_time_2.unix_time().cmp(&utc_date_time_2.unix_time()));
+        assert_eq!(
+            utc_date_time_2.cmp(&utc_date_time_1),
+            utc_date_time_2.unix_time().cmp(&utc_date_time_1.unix_time())
+        );
+        assert_eq!(
+            utc_date_time_2.cmp(&utc_date_time_2),
+            utc_date_time_2.unix_time().cmp(&utc_date_time_2.unix_time())
+        );
 
-        assert_eq!(utc_date_time_3.cmp(&utc_date_time_1), utc_date_time_3.unix_time().cmp(&utc_date_time_1.unix_time()));
-        assert_eq!(utc_date_time_3.cmp(&utc_date_time_3), utc_date_time_3.unix_time().cmp(&utc_date_time_3.unix_time()));
+        assert_eq!(
+            utc_date_time_3.cmp(&utc_date_time_1),
+            utc_date_time_3.unix_time().cmp(&utc_date_time_1.unix_time())
+        );
+        assert_eq!(
+            utc_date_time_3.cmp(&utc_date_time_3),
+            utc_date_time_3.unix_time().cmp(&utc_date_time_3.unix_time())
+        );
 
-        assert_eq!(utc_date_time_4.cmp(&utc_date_time_1), utc_date_time_4.unix_time().cmp(&utc_date_time_1.unix_time()));
-        assert_eq!(utc_date_time_4.cmp(&utc_date_time_4), utc_date_time_4.unix_time().cmp(&utc_date_time_4.unix_time()));
+        assert_eq!(
+            utc_date_time_4.cmp(&utc_date_time_1),
+            utc_date_time_4.unix_time().cmp(&utc_date_time_1.unix_time())
+        );
+        assert_eq!(
+            utc_date_time_4.cmp(&utc_date_time_4),
+            utc_date_time_4.unix_time().cmp(&utc_date_time_4.unix_time())
+        );
 
         Ok(())
     }
@@ -794,9 +909,13 @@ mod test {
             TimeZone::fixed(49550)?,
         ];
 
-        let utc_date_times = &[UtcDateTime::new(2000, 1, 2, 3, 4, 5, 0)?, UtcDateTime::new(2000, 1, 2, 3, 4, 5, 123_456_789)?];
+        let utc_date_times = &[
+            UtcDateTime::new(2000, 1, 2, 3, 4, 5, 0)?,
+            UtcDateTime::new(2000, 1, 2, 3, 4, 5, 123_456_789)?,
+        ];
 
-        let utc_date_time_strings = &["2000-01-02T03:04:05.000000000Z", "2000-01-02T03:04:05.123456789Z"];
+        let utc_date_time_strings =
+            &["2000-01-02T03:04:05.000000000Z", "2000-01-02T03:04:05.123456789Z"];
 
         let date_time_strings_list = &[
             &[
@@ -819,10 +938,15 @@ mod test {
             ],
         ];
 
-        for ((utc_date_time, &utc_date_time_string), &date_time_strings) in utc_date_times.iter().zip(utc_date_time_strings).zip(date_time_strings_list) {
+        for ((utc_date_time, &utc_date_time_string), &date_time_strings) in
+            utc_date_times.iter().zip(utc_date_time_strings).zip(date_time_strings_list)
+        {
             for (time_zone, &date_time_string) in time_zones.iter().zip(date_time_strings) {
                 assert_eq!(utc_date_time.to_string(), utc_date_time_string);
-                assert_eq!(utc_date_time.project(time_zone.as_ref())?.to_string(), date_time_string);
+                assert_eq!(
+                    utc_date_time.project(time_zone.as_ref())?.to_string(),
+                    date_time_string
+                );
             }
         }
 
@@ -842,17 +966,35 @@ mod test {
         assert!(DateTime::from_timespec(min_unix_time, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
         assert!(DateTime::from_timespec(max_unix_time, 0, TimeZone::fixed(0)?.as_ref()).is_ok());
 
-        assert!(matches!(UtcDateTime::from_timespec(min_unix_time - 1, 0), Err(OutOfRangeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(max_unix_time + 1, 0), Err(OutOfRangeError(_))));
+        assert!(matches!(
+            UtcDateTime::from_timespec(min_unix_time - 1, 0),
+            Err(OutOfRangeError(_))
+        ));
+        assert!(matches!(
+            UtcDateTime::from_timespec(max_unix_time + 1, 0),
+            Err(OutOfRangeError(_))
+        ));
 
-        assert!(matches!(UtcDateTime::from_timespec(min_unix_time, 0)?.project(TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(max_unix_time, 0)?.project(TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(
+            UtcDateTime::from_timespec(min_unix_time, 0)?.project(TimeZone::fixed(-1)?.as_ref()),
+            Err(ProjectDateTimeError(_))
+        ));
+        assert!(matches!(
+            UtcDateTime::from_timespec(max_unix_time, 0)?.project(TimeZone::fixed(1)?.as_ref()),
+            Err(ProjectDateTimeError(_))
+        ));
 
         assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(OutOfRangeError(_))));
         assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(OutOfRangeError(_))));
 
-        assert!(matches!(DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()), Err(ProjectDateTimeError(_))));
-        assert!(matches!(DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()), Err(ProjectDateTimeError(_))));
+        assert!(matches!(
+            DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()),
+            Err(ProjectDateTimeError(_))
+        ));
+        assert!(matches!(
+            DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()),
+            Err(ProjectDateTimeError(_))
+        ));
 
         Ok(())
     }
@@ -936,10 +1078,19 @@ mod test {
         let max_total_nanoseconds = 9223372036854775807999999999;
 
         assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds), Ok((i64::MIN, 0))));
-        assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds), Ok((i64::MAX, 999999999))));
+        assert!(matches!(
+            total_nanoseconds_to_timespec(max_total_nanoseconds),
+            Ok((i64::MAX, 999999999))
+        ));
 
-        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds - 1), Err(OutOfRangeError(_))));
-        assert!(matches!(total_nanoseconds_to_timespec(max_total_nanoseconds + 1), Err(OutOfRangeError(_))));
+        assert!(matches!(
+            total_nanoseconds_to_timespec(min_total_nanoseconds - 1),
+            Err(OutOfRangeError(_))
+        ));
+        assert!(matches!(
+            total_nanoseconds_to_timespec(max_total_nanoseconds + 1),
+            Err(OutOfRangeError(_))
+        ));
 
         Ok(())
     }
@@ -1021,7 +1172,10 @@ mod test {
         assert_eq!(DATE_TIME_2.nanoseconds(), UTC_DATE_TIME.nanoseconds());
 
         let date_time = UTC_DATE_TIME.project(TIME_ZONE_REF)?;
-        assert_eq!(date_time.local_time_type().time_zone_designation(), LOCAL_TIME_TYPE_1.time_zone_designation());
+        assert_eq!(
+            date_time.local_time_type().time_zone_designation(),
+            LOCAL_TIME_TYPE_1.time_zone_designation()
+        );
 
         let date_time_1 = DateTime::from_timespec(UTC_DATE_TIME.unix_time(), 1000, TIME_ZONE_REF)?;
         let date_time_2 = date_time_1.project(UTC)?;
@@ -1035,11 +1189,17 @@ mod test {
 
         assert_eq!(local_time_type_1.ut_offset(), LOCAL_TIME_TYPE_1.ut_offset());
         assert_eq!(local_time_type_1.is_dst(), LOCAL_TIME_TYPE_1.is_dst());
-        assert_eq!(local_time_type_1.time_zone_designation(), LOCAL_TIME_TYPE_1.time_zone_designation());
+        assert_eq!(
+            local_time_type_1.time_zone_designation(),
+            LOCAL_TIME_TYPE_1.time_zone_designation()
+        );
 
         assert_eq!(local_time_type_2.ut_offset(), LOCAL_TIME_TYPE_2.ut_offset());
         assert_eq!(local_time_type_2.is_dst(), LOCAL_TIME_TYPE_2.is_dst());
-        assert_eq!(local_time_type_2.time_zone_designation(), LOCAL_TIME_TYPE_2.time_zone_designation());
+        assert_eq!(
+            local_time_type_2.time_zone_designation(),
+            LOCAL_TIME_TYPE_2.time_zone_designation()
+        );
 
         Ok(())
     }

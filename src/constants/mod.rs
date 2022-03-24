@@ -32,11 +32,13 @@ pub const DAYS_PER_400_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 400 + 97;
 /// Month days in a normal year
 pub const DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
 /// Cumulated month days in a normal year
-pub const CUMUL_DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
+pub const CUMUL_DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] =
+    [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
 
 /// Unix time at `2000-03-01T00:00:00Z` (Wednesday)
 pub const UNIX_OFFSET_SECS: i64 = 951868800;
 /// Offset year
 pub const OFFSET_YEAR: i64 = 2000;
 /// Month days in a leap year from March
-pub const DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH: [i64; 12] = [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29];
+pub const DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH: [i64; 12] =
+    [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29];

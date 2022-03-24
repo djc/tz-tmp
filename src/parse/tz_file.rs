@@ -64,7 +64,11 @@ fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
     let type_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
     let char_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
 
-    if !(type_count != 0 && char_count != 0 && (ut_local_count == 0 || ut_local_count == type_count) && (std_wall_count == 0 || std_wall_count == type_count)) {
+    if !(type_count != 0
+        && char_count != 0
+        && (ut_local_count == 0 || ut_local_count == type_count)
+        && (std_wall_count == 0 || std_wall_count == type_count))
+    {
         return Err(TzFileError::InvalidTzFile("invalid header"));
     }
 
@@ -80,7 +84,10 @@ fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
 }
 
 /// Parse TZif footer
-fn parse_footer(footer: &[u8], use_string_extensions: bool) -> Result<Option<TransitionRule>, TzError> {
+fn parse_footer(
+    footer: &[u8],
+    use_string_extensions: bool,
+) -> Result<Option<TransitionRule>, TzError> {
     let footer = str::from_utf8(footer)?;
     if !(footer.starts_with('\n') && footer.ends_with('\n')) {
         return Err(TzFileError::InvalidTzFile("invalid footer").into());
@@ -120,7 +127,11 @@ struct DataBlock<'a> {
 
 impl<'a> DataBlock<'a> {
     /// Read TZif data blocks
-    fn new(cursor: &mut Cursor<'a>, header: &Header, version: Version) -> Result<Self, TzFileError> {
+    fn new(
+        cursor: &mut Cursor<'a>,
+        header: &Header,
+        version: Version,
+    ) -> Result<Self, TzFileError> {
         let time_size = match version {
             Version::V1 => 4,
             Version::V2 | Version::V3 => 8,
@@ -149,7 +160,9 @@ impl<'a> DataBlock<'a> {
     /// Parse time zone data
     fn parse(&self, header: &Header, footer: Option<&[u8]>) -> Result<TimeZone, TzError> {
         let mut transitions = Vec::with_capacity(header.transition_count);
-        for (arr_time, &local_time_type_index) in self.transition_times.chunks_exact(self.time_size).zip(self.transition_types) {
+        for (arr_time, &local_time_type_index) in
+            self.transition_times.chunks_exact(self.time_size).zip(self.transition_types)
+        {
             let unix_leap_time = self.parse_time(&arr_time[0..self.time_size], header.version)?;
             let local_time_type_index = local_time_type_index as usize;
             transitions.push(Transition::new(unix_leap_time, local_time_type_index));
@@ -167,21 +180,30 @@ impl<'a> DataBlock<'a> {
 
             let char_index = arr[5] as usize;
             if char_index >= header.char_count {
-                return Err(TzFileError::InvalidTzFile("invalid time zone designation char index").into());
+                return Err(
+                    TzFileError::InvalidTzFile("invalid time zone designation char index").into()
+                );
             }
 
-            let time_zone_designation = match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
-                None => return Err(TzFileError::InvalidTzFile("invalid time zone designation char index").into()),
-                Some(position) => {
-                    let time_zone_designation = &self.time_zone_designations[char_index..char_index + position];
-
-                    if !time_zone_designation.is_empty() {
-                        Some(time_zone_designation)
-                    } else {
-                        None
+            let time_zone_designation =
+                match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
+                    None => {
+                        return Err(TzFileError::InvalidTzFile(
+                            "invalid time zone designation char index",
+                        )
+                        .into())
                     }
-                }
-            };
+                    Some(position) => {
+                        let time_zone_designation =
+                            &self.time_zone_designations[char_index..char_index + position];
+
+                        if !time_zone_designation.is_empty() {
+                            Some(time_zone_designation)
+                        } else {
+                            None
+                        }
+                    }
+                };
 
             local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
         }
@@ -189,7 +211,8 @@ impl<'a> DataBlock<'a> {
         let mut leap_seconds = Vec::with_capacity(header.leap_count);
         for arr in self.leap_seconds.chunks_exact(self.time_size + 4) {
             let unix_leap_time = self.parse_time(&arr[0..self.time_size], header.version)?;
-            let correction = i32::from_be_bytes(arr[self.time_size..self.time_size + 4].try_into()?);
+            let correction =
+                i32::from_be_bytes(arr[self.time_size..self.time_size + 4].try_into()?);
             leap_seconds.push(LeapSecond::new(unix_leap_time, correction));
         }
 
@@ -197,11 +220,16 @@ impl<'a> DataBlock<'a> {
         let ut_locals_iter = self.ut_locals.iter().copied().chain(iter::repeat(0));
         for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(header.type_count) {
             if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
-                return Err(TzFileError::InvalidTzFile("invalid couple of standard/wall and UT/local indicators").into());
+                return Err(TzFileError::InvalidTzFile(
+                    "invalid couple of standard/wall and UT/local indicators",
+                )
+                .into());
             }
         }
 
-        let extra_rule = footer.and_then(|footer| parse_footer(footer, header.version == Version::V3).transpose()).transpose()?;
+        let extra_rule = footer
+            .and_then(|footer| parse_footer(footer, header.version == Version::V3).transpose())
+            .transpose()?;
 
         Ok(TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)?)
     }
@@ -218,7 +246,10 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
             let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
 
             if !cursor.is_empty() {
-                return Err(TzFileError::InvalidTzFile("remaining data after end of TZif v1 data block").into());
+                return Err(TzFileError::InvalidTzFile(
+                    "remaining data after end of TZif v1 data block",
+                )
+                .into());
             }
 
             Ok(data_block.parse(&header, None)?)
@@ -245,7 +276,8 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
     #[cfg(unix)]
     {
         // Possible system timezone directories
-        const ZONE_INFO_DIRECTORIES: [&str; 3] = ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
+        const ZONE_INFO_DIRECTORIES: [&str; 3] =
+            ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
 
         if tz_string.starts_with('/') {
             Ok(File::open(tz_string)?)
@@ -340,8 +372,14 @@ mod test {
 
         assert_eq!(time_zone, time_zone_result);
 
-        assert_eq!(*time_zone.find_local_time_type(-1156939200)?, LocalTimeType::new(-34200, true, Some(b"HDT"))?);
-        assert_eq!(*time_zone.find_local_time_type(1546300800)?, LocalTimeType::new(-36000, false, Some(b"HST"))?);
+        assert_eq!(
+            *time_zone.find_local_time_type(-1156939200)?,
+            LocalTimeType::new(-34200, true, Some(b"HDT"))?
+        );
+        assert_eq!(
+            *time_zone.find_local_time_type(1546300800)?,
+            LocalTimeType::new(-36000, false, Some(b"HST"))?
+        );
 
         Ok(())
     }

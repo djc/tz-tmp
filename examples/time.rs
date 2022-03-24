@@ -65,7 +65,8 @@ fn main() -> Result<()> {
     println!("{:#?}", other_date_time);
 
     // Create a new date time from a Unix time with nanoseconds and a time zone (2000-01-01T00:00:00.123456789Z)
-    let another_date_time = DateTime::from_timespec(946684800, 123_456_789, TimeZone::fixed(86400)?.as_ref())?;
+    let another_date_time =
+        DateTime::from_timespec(946684800, 123_456_789, TimeZone::fixed(86400)?.as_ref())?;
     println!("{}", another_date_time);
     println!("{:#?}", another_date_time);
 

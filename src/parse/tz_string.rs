@@ -80,7 +80,9 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
     match cursor.remaining().get(0) {
         Some(b'J') => {
             cursor.read_exact(1)?;
-            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)?))
+            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(parse_int(
+                cursor.read_while(u8::is_ascii_digit)?,
+            )?)?))
         }
         Some(b'M') => {
             cursor.read_exact(1)?;
@@ -93,7 +95,9 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
 
             Ok(RuleDay::MonthWeekDay(MonthWeekDay::new(month, week, week_day)?))
         }
-        _ => Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(parse_int(cursor.read_while(u8::is_ascii_digit)?)?)?)),
+        _ => Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(parse_int(
+            cursor.read_while(u8::is_ascii_digit)?,
+        )?)?)),
     }
 }
 
@@ -132,7 +136,10 @@ fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 }
 
 /// Parse transition rule
-fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<(RuleDay, i32), TzError> {
+fn parse_rule_block(
+    cursor: &mut Cursor,
+    use_string_extensions: bool,
+) -> Result<(RuleDay, i32), TzError> {
     let date = parse_rule_day(cursor)?;
 
     let time = if cursor.read_optional_tag(b"/")? {
@@ -152,7 +159,10 @@ fn parse_rule_block(cursor: &mut Cursor, use_string_extensions: bool) -> Result<
 ///
 /// TZ string extensions from [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536#section-3.3.1) may be used.
 ///
-pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> Result<TransitionRule, TzError> {
+pub(crate) fn parse_posix_tz(
+    tz_string: &[u8],
+    use_string_extensions: bool,
+) -> Result<TransitionRule, TzError> {
     let mut cursor = Cursor::new(tz_string);
 
     let std_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
@@ -167,11 +177,18 @@ pub(crate) fn parse_posix_tz(tz_string: &[u8], use_string_extensions: bool) -> R
     let dst_offset = match cursor.remaining().get(0) {
         Some(&b',') => std_offset - 3600,
         Some(_) => parse_offset(&mut cursor)?,
-        None => return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided").into()),
+        None => {
+            return Err(TzStringError::UnsupportedTzString(
+                "DST start and end rules must be provided",
+            )
+            .into())
+        }
     };
 
     if cursor.is_empty() {
-        return Err(TzStringError::UnsupportedTzString("DST start and end rules must be provided").into());
+        return Err(
+            TzStringError::UnsupportedTzString("DST start and end rules must be provided").into()
+        );
     }
 
     cursor.read_tag(b",")?;
@@ -203,7 +220,8 @@ mod test {
         let tz_string = b"HST10";
 
         let transition_rule = parse_posix_tz(tz_string, false)?;
-        let transition_rule_result = TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?);
+        let transition_rule_result =
+            TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?);
 
         assert_eq!(transition_rule, transition_rule_result);
 
@@ -316,8 +334,14 @@ mod test {
 
     #[test]
     fn test_error() -> Result<(), TzError> {
-        assert!(matches!(parse_posix_tz(b"IST-1GMT0", false), Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))));
-        assert!(matches!(parse_posix_tz(b"EET-2EEST", false), Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))));
+        assert!(matches!(
+            parse_posix_tz(b"IST-1GMT0", false),
+            Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))
+        ));
+        assert!(matches!(
+            parse_posix_tz(b"EET-2EEST", false),
+            Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))
+        ));
 
         Ok(())
     }
