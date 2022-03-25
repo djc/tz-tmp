@@ -438,38 +438,6 @@ impl AlternateTime {
 
         Ok(Self { std, dst, dst_start, dst_start_time, dst_end, dst_end_time })
     }
-}
-
-impl AlternateTime {
-    /// Returns local time type for standard time
-    pub fn std(&self) -> &LocalTimeType {
-        &self.std
-    }
-
-    /// Returns local time type for Daylight Saving Time
-    pub fn dst(&self) -> &LocalTimeType {
-        &self.dst
-    }
-
-    /// Returns start day of Daylight Saving Time
-    pub fn dst_start(&self) -> &RuleDay {
-        &self.dst_start
-    }
-
-    /// Returns local start day time of Daylight Saving Time, in seconds
-    pub fn dst_start_time(&self) -> i32 {
-        self.dst_start_time
-    }
-
-    /// Returns end day of Daylight Saving Time
-    pub fn dst_end(&self) -> &RuleDay {
-        &self.dst_end
-    }
-
-    /// Returns local end day time of Daylight Saving Time, in seconds
-    pub fn dst_end_time(&self) -> i32 {
-        self.dst_end_time
-    }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
     fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
