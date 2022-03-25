@@ -1,5 +1,7 @@
 //! Parsing functions.
 
+use crate::error::TzStringError;
+
 mod tz_file;
 pub(crate) use tz_file::{get_tz_file, parse_tz_file};
 
@@ -7,6 +9,8 @@ mod tz_string;
 pub(crate) use tz_string::parse_posix_tz;
 
 use std::io::{Error, ErrorKind};
+use std::num::ParseIntError;
+use std::str::{self, FromStr};
 
 /// A `Cursor` contains a slice of a buffer and a read count.
 #[derive(Debug, Eq, PartialEq)]
@@ -70,6 +74,12 @@ impl<'a> Cursor<'a> {
             None => self.read_exact(self.remaining.len()),
             Some(position) => self.read_exact(position),
         }
+    }
+
+    // Parse an integer out of the ASCII digits
+    pub fn read_int<T: FromStr<Err = ParseIntError>>(&mut self) -> Result<T, TzStringError> {
+        let bytes = self.read_while(u8::is_ascii_digit)?;
+        Ok(str::from_utf8(bytes)?.parse()?)
     }
 
     /// Read bytes until the provided predicate is true

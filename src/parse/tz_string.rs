@@ -7,14 +7,6 @@ use crate::timezone::{
     TransitionRule,
 };
 
-use std::num::ParseIntError;
-use std::str::{self, FromStr};
-
-/// Parse integer from a slice of bytes
-fn parse_int<T: FromStr<Err = ParseIntError>>(bytes: &[u8]) -> Result<T, TzStringError> {
-    Ok(str::from_utf8(bytes)?.parse()?)
-}
-
 /// Parse time zone designation
 fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], TzStringError> {
     match cursor.remaining().get(0) {
@@ -30,16 +22,16 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
 
 /// Parse hours, minutes and seconds
 fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
-    let hour = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+    let hour = cursor.read_int()?;
 
     let mut minute = 0;
     let mut second = 0;
 
     if cursor.read_optional_tag(b":")? {
-        minute = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+        minute = cursor.read_int()?;
 
         if cursor.read_optional_tag(b":")? {
-            second = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+            second = cursor.read_int()?;
         }
     }
 
@@ -82,24 +74,20 @@ fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
     match cursor.remaining().get(0) {
         Some(b'J') => {
             cursor.read_exact(1)?;
-            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(parse_int(
-                cursor.read_while(u8::is_ascii_digit)?,
-            )?)?))
+            Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(cursor.read_int()?)?))
         }
         Some(b'M') => {
             cursor.read_exact(1)?;
 
-            let month = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+            let month = cursor.read_int()?;
             cursor.read_tag(b".")?;
-            let week = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+            let week = cursor.read_int()?;
             cursor.read_tag(b".")?;
-            let week_day = parse_int(cursor.read_while(u8::is_ascii_digit)?)?;
+            let week_day = cursor.read_int()?;
 
             Ok(RuleDay::MonthWeekDay(MonthWeekDay::new(month, week, week_day)?))
         }
-        _ => Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(parse_int(
-            cursor.read_while(u8::is_ascii_digit)?,
-        )?)?)),
+        _ => Ok(RuleDay::Julian0WithLeap(Julian0WithLeap::new(cursor.read_int()?)?)),
     }
 }
 
