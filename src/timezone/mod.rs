@@ -1009,8 +1009,6 @@ impl<'a> TimeZoneRef<'a> {
     }
 }
 
-const UTC_TYPE: LocalTimeType = LocalTimeType::utc();
-
 impl TimeZone {
     /// Returns local time zone.
     ///
@@ -1398,3 +1396,5 @@ impl<'a> DataBlock<'a> {
 const SECONDS_PER_WEEK: i64 = SECONDS_PER_DAY * DAYS_PER_WEEK;
 /// Number of seconds in 28 days
 const SECONDS_PER_28_DAYS: i64 = SECONDS_PER_DAY * 28;
+
+const UTC_TYPE: LocalTimeType = LocalTimeType::utc();
