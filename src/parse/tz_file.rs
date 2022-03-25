@@ -83,7 +83,7 @@ impl Header {
 
 /// TZif data blocks
 struct DataBlock<'a> {
-    header: &'a Header,
+    header: Header,
     /// Time size in bytes
     time_size: usize,
     /// Transition times data block
@@ -106,16 +106,15 @@ impl<'a> DataBlock<'a> {
     /// Read TZif data blocks
     fn new(
         cursor: &mut Cursor<'a>,
-        header: &'a Header,
-        version: Version,
+        first: bool,
     ) -> Result<Self, TzFileError> {
-        let time_size = match version {
-            Version::V1 => 4,
-            Version::V2 | Version::V3 => 8,
+        let header = Header::new(cursor)?;
+        let time_size = match first {
+            true => 4, // We always parse V1 first
+            false => 8,
         };
 
         Ok(Self {
-            header,
             time_size,
             transition_times: cursor.read_exact(header.transition_count * time_size)?,
             transition_types: cursor.read_exact(header.transition_count)?,
@@ -124,6 +123,7 @@ impl<'a> DataBlock<'a> {
             leap_seconds: cursor.read_exact(header.leap_count * (time_size + 4))?,
             std_walls: cursor.read_exact(header.std_wall_count)?,
             ut_locals: cursor.read_exact(header.ut_local_count)?,
+            header,
         })
     }
 
@@ -237,9 +237,8 @@ impl<'a> DataBlock<'a> {
 /// Parse TZif file as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536)
 pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
     let mut cursor = Cursor::new(bytes);
-    let header = Header::new(&mut cursor)?;
-    let data_block = DataBlock::new(&mut cursor, &header, Version::V1)?;
-    match header.version {
+    let data_block = DataBlock::new(&mut cursor, true)?;
+    match data_block.header.version {
         Version::V1 => match cursor.is_empty() {
             true => data_block.parse(None),
             false => {
@@ -250,8 +249,7 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
             }
         },
         Version::V2 | Version::V3 => {
-            let header = Header::new(&mut cursor)?;
-            let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
+            let data_block = DataBlock::new(&mut cursor, false)?;
             data_block.parse(Some(cursor.remaining()))
         }
     }
