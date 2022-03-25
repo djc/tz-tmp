@@ -752,6 +752,142 @@ pub struct TimeZone {
     extra_rule: Option<TransitionRule>,
 }
 
+impl TimeZone {
+    /// Returns local time zone.
+    ///
+    /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
+    ///
+    pub fn local() -> Result<Self, TzError> {
+        #[cfg(not(unix))]
+        let local_time_zone = Self::utc();
+
+        #[cfg(unix)]
+        let local_time_zone = Self::from_posix_tz("localtime")?;
+
+        Ok(local_time_zone)
+    }
+
+    /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
+    pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
+        if tz_string.is_empty() {
+            return Err(TzError::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
+        }
+
+        if tz_string == "localtime" {
+            return Self::from_tz_data(&fs::read("/etc/localtime")?);
+        }
+
+        let mut chars = tz_string.chars();
+        if chars.next() == Some(':') {
+            return Self::from_file(&mut get_tz_file(chars.as_str())?);
+        }
+
+        if let Ok(mut file) = get_tz_file(tz_string) {
+            return Self::from_file(&mut file);
+        }
+
+        // TZ string extensions are not allowed
+        let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
+        let rule = TransitionRule::from_tz_string(tz_string.as_bytes(), false)?;
+        Ok(Self::new(
+            vec![],
+            match rule {
+                TransitionRule::Fixed(local_time_type) => vec![local_time_type],
+                TransitionRule::Alternate(AlternateTime { std, dst, .. }) => vec![std, dst],
+            },
+            vec![],
+            Some(rule),
+        )?)
+    }
+
+    /// Construct a time zone
+    pub fn new(
+        transitions: Vec<Transition>,
+        local_time_types: Vec<LocalTimeType>,
+        leap_seconds: Vec<LeapSecond>,
+        extra_rule: Option<TransitionRule>,
+    ) -> Result<Self, TimeZoneError> {
+        TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule)
+            .check_inputs()?;
+        Ok(Self { transitions, local_time_types, leap_seconds, extra_rule })
+    }
+
+    /// Construct a time zone from the contents of a time zone file
+    pub fn from_file(file: &mut File) -> Result<Self, TzError> {
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Self::from_tz_data(&bytes)
+    }
+
+    /// Construct a time zone from the contents of a time zone file
+    ///
+    /// Parse TZif data as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536).
+    pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
+        let mut cursor = Cursor::new(bytes);
+        let data_block = DataBlock::new(&mut cursor, true)?;
+        match data_block.header.version {
+            Version::V1 => match cursor.is_empty() {
+                true => data_block.parse(None),
+                false => {
+                    return Err(TzFileError::InvalidTzFile(
+                        "remaining data after end of TZif v1 data block",
+                    )
+                    .into())
+                }
+            },
+            Version::V2 | Version::V3 => {
+                let data_block = DataBlock::new(&mut cursor, false)?;
+                data_block.parse(Some(cursor.remaining()))
+            }
+        }
+    }
+
+    /// Construct a time zone with the specified UTC offset in seconds
+    pub fn fixed(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
+        Ok(Self {
+            transitions: Vec::new(),
+            local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?],
+            leap_seconds: Vec::new(),
+            extra_rule: None,
+        })
+    }
+
+    /// Construct the time zone associated to UTC
+    pub fn utc() -> Self {
+        Self {
+            transitions: Vec::new(),
+            local_time_types: vec![LocalTimeType::utc()],
+            leap_seconds: Vec::new(),
+            extra_rule: None,
+        }
+    }
+
+    /// Find the current local time type associated to the time zone
+    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
+        Ok(self.find_local_time_type(
+            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?,
+        )?)
+    }
+
+    /// Find the local time type associated to the time zone at the specified Unix time in seconds
+    pub fn find_local_time_type(
+        &self,
+        unix_time: i64,
+    ) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
+        self.as_ref().find_local_time_type(unix_time)
+    }
+
+    /// Returns a reference to the time zone
+    pub fn as_ref(&self) -> TimeZoneRef {
+        TimeZoneRef::new_unchecked(
+            &self.transitions,
+            &self.local_time_types,
+            &self.leap_seconds,
+            &self.extra_rule,
+        )
+    }
+}
+
 /// Reference to a time zone
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct TimeZoneRef<'a> {
@@ -1006,142 +1142,6 @@ impl<'a> TimeZoneRef<'a> {
             Some(unix_time) => Ok(unix_time),
             None => Err(OutOfRangeError("out of range operation")),
         }
-    }
-}
-
-impl TimeZone {
-    /// Returns local time zone.
-    ///
-    /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
-    ///
-    pub fn local() -> Result<Self, TzError> {
-        #[cfg(not(unix))]
-        let local_time_zone = Self::utc();
-
-        #[cfg(unix)]
-        let local_time_zone = Self::from_posix_tz("localtime")?;
-
-        Ok(local_time_zone)
-    }
-
-    /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
-    pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
-        if tz_string.is_empty() {
-            return Err(TzError::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
-        }
-
-        if tz_string == "localtime" {
-            return Self::from_tz_data(&fs::read("/etc/localtime")?);
-        }
-
-        let mut chars = tz_string.chars();
-        if chars.next() == Some(':') {
-            return Self::from_file(&mut get_tz_file(chars.as_str())?);
-        }
-
-        if let Ok(mut file) = get_tz_file(tz_string) {
-            return Self::from_file(&mut file);
-        }
-
-        // TZ string extensions are not allowed
-        let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
-        let rule = TransitionRule::from_tz_string(tz_string.as_bytes(), false)?;
-        Ok(Self::new(
-            vec![],
-            match rule {
-                TransitionRule::Fixed(local_time_type) => vec![local_time_type],
-                TransitionRule::Alternate(AlternateTime { std, dst, .. }) => vec![std, dst],
-            },
-            vec![],
-            Some(rule),
-        )?)
-    }
-
-    /// Construct a time zone
-    pub fn new(
-        transitions: Vec<Transition>,
-        local_time_types: Vec<LocalTimeType>,
-        leap_seconds: Vec<LeapSecond>,
-        extra_rule: Option<TransitionRule>,
-    ) -> Result<Self, TimeZoneError> {
-        TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule)
-            .check_inputs()?;
-        Ok(Self { transitions, local_time_types, leap_seconds, extra_rule })
-    }
-
-    /// Construct a time zone from the contents of a time zone file
-    pub fn from_file(file: &mut File) -> Result<Self, TzError> {
-        let mut bytes = Vec::new();
-        file.read_to_end(&mut bytes)?;
-        Self::from_tz_data(&bytes)
-    }
-
-    /// Construct a time zone from the contents of a time zone file
-    ///
-    /// Parse TZif data as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536).
-    pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
-        let mut cursor = Cursor::new(bytes);
-        let data_block = DataBlock::new(&mut cursor, true)?;
-        match data_block.header.version {
-            Version::V1 => match cursor.is_empty() {
-                true => data_block.parse(None),
-                false => {
-                    return Err(TzFileError::InvalidTzFile(
-                        "remaining data after end of TZif v1 data block",
-                    )
-                    .into())
-                }
-            },
-            Version::V2 | Version::V3 => {
-                let data_block = DataBlock::new(&mut cursor, false)?;
-                data_block.parse(Some(cursor.remaining()))
-            }
-        }
-    }
-
-    /// Construct a time zone with the specified UTC offset in seconds
-    pub fn fixed(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
-        Ok(Self {
-            transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?],
-            leap_seconds: Vec::new(),
-            extra_rule: None,
-        })
-    }
-
-    /// Construct the time zone associated to UTC
-    pub fn utc() -> Self {
-        Self {
-            transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType::utc()],
-            leap_seconds: Vec::new(),
-            extra_rule: None,
-        }
-    }
-
-    /// Find the current local time type associated to the time zone
-    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
-        Ok(self.find_local_time_type(
-            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?,
-        )?)
-    }
-
-    /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    pub fn find_local_time_type(
-        &self,
-        unix_time: i64,
-    ) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
-        self.as_ref().find_local_time_type(unix_time)
-    }
-
-    /// Returns a reference to the time zone
-    pub fn as_ref(&self) -> TimeZoneRef {
-        TimeZoneRef::new_unchecked(
-            &self.transitions,
-            &self.local_time_types,
-            &self.leap_seconds,
-            &self.extra_rule,
-        )
     }
 }
 
