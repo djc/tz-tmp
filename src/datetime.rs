@@ -215,6 +215,56 @@ impl UtcDateTime {
     pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
+
+    /// Returns year
+    pub fn year(&self) -> i32 {
+        self.year
+    }
+
+    /// Returns month in `[1, 12]`
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+
+    /// Returns day of the month in `[1, 31]`
+    pub fn month_day(&self) -> u8 {
+        self.month_day
+    }
+
+    /// Returns hours since midnight in `[0, 23]`
+    pub fn hour(&self) -> u8 {
+        self.hour
+    }
+
+    /// Returns minutes in `[0, 59]`
+    pub fn minute(&self) -> u8 {
+        self.minute
+    }
+
+    /// Returns seconds in `[0, 60]`, with a possible leap second
+    pub fn second(&self) -> u8 {
+        self.second
+    }
+
+    /// Returns nanoseconds in `[0, 999_999_999]`
+    pub fn nanoseconds(&self) -> u32 {
+        self.nanoseconds
+    }
+
+    /// Returns days since Sunday in `[0, 6]`
+    pub fn week_day(&self) -> u8 {
+        week_day(self.year, self.month as usize, self.month_day as i64)
+    }
+
+    /// Returns days since January 1 in `[0, 365]`
+    pub fn year_day(&self) -> u16 {
+        year_day(self.year, self.month as usize, self.month_day as i64)
+    }
+
+    /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    pub fn total_nanoseconds(&self) -> i128 {
+        nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
+    }
 }
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -333,69 +383,56 @@ impl DateTime {
     pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
-}
 
-/// Macro for implementing date time getters
-macro_rules! impl_datetime {
-    () => {
-        /// Returns year
-        pub fn year(&self) -> i32 {
-            self.year
-        }
+    /// Returns year
+    pub fn year(&self) -> i32 {
+        self.year
+    }
 
-        /// Returns month in `[1, 12]`
-        pub fn month(&self) -> u8 {
-            self.month
-        }
+    /// Returns month in `[1, 12]`
+    pub fn month(&self) -> u8 {
+        self.month
+    }
 
-        /// Returns day of the month in `[1, 31]`
-        pub fn month_day(&self) -> u8 {
-            self.month_day
-        }
+    /// Returns day of the month in `[1, 31]`
+    pub fn month_day(&self) -> u8 {
+        self.month_day
+    }
 
-        /// Returns hours since midnight in `[0, 23]`
-        pub fn hour(&self) -> u8 {
-            self.hour
-        }
+    /// Returns hours since midnight in `[0, 23]`
+    pub fn hour(&self) -> u8 {
+        self.hour
+    }
 
-        /// Returns minutes in `[0, 59]`
-        pub fn minute(&self) -> u8 {
-            self.minute
-        }
+    /// Returns minutes in `[0, 59]`
+    pub fn minute(&self) -> u8 {
+        self.minute
+    }
 
-        /// Returns seconds in `[0, 60]`, with a possible leap second
-        pub fn second(&self) -> u8 {
-            self.second
-        }
+    /// Returns seconds in `[0, 60]`, with a possible leap second
+    pub fn second(&self) -> u8 {
+        self.second
+    }
 
-        /// Returns nanoseconds in `[0, 999_999_999]`
-        pub fn nanoseconds(&self) -> u32 {
-            self.nanoseconds
-        }
+    /// Returns nanoseconds in `[0, 999_999_999]`
+    pub fn nanoseconds(&self) -> u32 {
+        self.nanoseconds
+    }
 
-        /// Returns days since Sunday in `[0, 6]`
-        pub fn week_day(&self) -> u8 {
-            week_day(self.year, self.month as usize, self.month_day as i64)
-        }
+    /// Returns days since Sunday in `[0, 6]`
+    pub fn week_day(&self) -> u8 {
+        week_day(self.year, self.month as usize, self.month_day as i64)
+    }
 
-        /// Returns days since January 1 in `[0, 365]`
-        pub fn year_day(&self) -> u16 {
-            year_day(self.year, self.month as usize, self.month_day as i64)
-        }
+    /// Returns days since January 1 in `[0, 365]`
+    pub fn year_day(&self) -> u16 {
+        year_day(self.year, self.month as usize, self.month_day as i64)
+    }
 
-        /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-        pub fn total_nanoseconds(&self) -> i128 {
-            nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
-        }
-    };
-}
-
-impl UtcDateTime {
-    impl_datetime!();
-}
-
-impl DateTime {
-    impl_datetime!();
+    /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    pub fn total_nanoseconds(&self) -> i128 {
+        nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
+    }
 
     /// Returns local time type
     pub fn local_time_type(&self) -> &LocalTimeType {
