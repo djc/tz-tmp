@@ -383,6 +383,24 @@ impl RuleDay {
     }
 }
 
+impl From<Julian0WithLeap> for RuleDay {
+    fn from(inner: Julian0WithLeap) -> Self {
+        Self::Julian0WithLeap(inner)
+    }
+}
+
+impl From<Julian1WithoutLeap> for RuleDay {
+    fn from(inner: Julian1WithoutLeap) -> Self {
+        Self::Julian1WithoutLeap(inner)
+    }
+}
+
+impl From<MonthWeekDay> for RuleDay {
+    fn from(inner: MonthWeekDay) -> Self {
+        Self::MonthWeekDay(inner)
+    }
+}
+
 /// Transition rule representing alternate local time types
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct AlternateTime {
@@ -978,17 +996,17 @@ mod test {
 
     #[test]
     fn test_rule_day() -> Result<(), crate::TzError> {
-        let rule_day_j1 = RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(60)?);
+        let rule_day_j1 = RuleDay::from(Julian1WithoutLeap::new(60)?);
         assert_eq!(rule_day_j1.transition_date(2000), (3, 1));
         assert_eq!(rule_day_j1.transition_date(2001), (3, 1));
         assert_eq!(rule_day_j1.unix_time(2000, 43200), 951912000);
 
-        let rule_day_j0 = RuleDay::Julian0WithLeap(Julian0WithLeap::new(59)?);
+        let rule_day_j0 = RuleDay::from(Julian0WithLeap::new(59)?);
         assert_eq!(rule_day_j0.transition_date(2000), (2, 29));
         assert_eq!(rule_day_j0.transition_date(2001), (3, 1));
         assert_eq!(rule_day_j0.unix_time(2000, 43200), 951825600);
 
-        let rule_day_mwd = RuleDay::MonthWeekDay(MonthWeekDay::new(2, 5, 2)?);
+        let rule_day_mwd = RuleDay::from(MonthWeekDay::new(2, 5, 2)?);
         assert_eq!(rule_day_mwd.transition_date(2000), (2, 29));
         assert_eq!(rule_day_mwd.transition_date(2001), (2, 27));
         assert_eq!(rule_day_mwd.unix_time(2000, 43200), 951825600);
@@ -1005,9 +1023,9 @@ mod test {
         let transition_rule_dst = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(43200, false, Some(b"NZST"))?,
             LocalTimeType::new(46800, true, Some(b"NZDT"))?,
-            RuleDay::MonthWeekDay(MonthWeekDay::new(10, 1, 0)?),
+            RuleDay::from(MonthWeekDay::new(10, 1, 0)?),
             7200,
-            RuleDay::MonthWeekDay(MonthWeekDay::new(3, 3, 0)?),
+            RuleDay::from(MonthWeekDay::new(3, 3, 0)?),
             7200,
         )?);
 
@@ -1019,9 +1037,9 @@ mod test {
         let transition_rule_negative_dst = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(3600, false, Some(b"IST"))?,
             LocalTimeType::new(0, true, Some(b"GMT"))?,
-            RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
+            RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
             7200,
-            RuleDay::MonthWeekDay(MonthWeekDay::new(3, 5, 0)?),
+            RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
             3600,
         )?);
 
@@ -1033,9 +1051,9 @@ mod test {
         let transition_rule_negative_time_1 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(0, false, None)?,
             LocalTimeType::new(0, true, None)?,
-            RuleDay::Julian0WithLeap(Julian0WithLeap::new(100)?),
+            RuleDay::from(Julian0WithLeap::new(100)?),
             0,
-            RuleDay::Julian0WithLeap(Julian0WithLeap::new(101)?),
+            RuleDay::from(Julian0WithLeap::new(101)?),
             -86500,
         )?);
 
@@ -1047,9 +1065,9 @@ mod test {
         let transition_rule_negative_time_2 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-10800, false, Some(b"-03"))?,
             LocalTimeType::new(-7200, true, Some(b"-02"))?,
-            RuleDay::MonthWeekDay(MonthWeekDay::new(3, 5, 0)?),
+            RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
             -7200,
-            RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
+            RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
             -3600,
         )?);
 
@@ -1073,9 +1091,9 @@ mod test {
         let transition_rule_all_year_dst = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-18000, false, Some(b"EST"))?,
             LocalTimeType::new(-14400, true, Some(b"EDT"))?,
-            RuleDay::Julian0WithLeap(Julian0WithLeap::new(0)?),
+            RuleDay::from(Julian0WithLeap::new(0)?),
             0,
-            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            RuleDay::from(Julian1WithoutLeap::new(365)?),
             90000,
         )?);
 
@@ -1096,18 +1114,18 @@ mod test {
         let transition_rule_1 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(-1, false, None)?,
             LocalTimeType::new(-1, true, None)?,
-            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            RuleDay::from(Julian1WithoutLeap::new(365)?),
             0,
-            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
+            RuleDay::from(Julian1WithoutLeap::new(1)?),
             0,
         )?);
 
         let transition_rule_2 = TransitionRule::Alternate(AlternateTime::new(
             LocalTimeType::new(1, false, None)?,
             LocalTimeType::new(1, true, None)?,
-            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(365)?),
+            RuleDay::from(Julian1WithoutLeap::new(365)?),
             0,
-            RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(1)?),
+            RuleDay::from(Julian1WithoutLeap::new(1)?),
             0,
         )?);
 

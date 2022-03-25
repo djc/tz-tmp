@@ -402,9 +402,9 @@ mod test {
             Some(TransitionRule::Alternate(AlternateTime::new(
                 LocalTimeType::new(7200, false, Some(b"IST"))?,
                 LocalTimeType::new(10800, true, Some(b"IDT"))?,
-                RuleDay::MonthWeekDay(MonthWeekDay::new(3, 4, 4)?),
+                RuleDay::from(MonthWeekDay::new(3, 4, 4)?),
                 93600,
-                RuleDay::MonthWeekDay(MonthWeekDay::new(10, 5, 0)?),
+                RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
                 7200,
             )?)),
         )?;
