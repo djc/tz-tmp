@@ -27,6 +27,10 @@ impl<'a> Cursor<'a> {
         Self { remaining, read_count: 0 }
     }
 
+    pub fn peek(&self) -> Option<&u8> {
+        self.remaining().get(0)
+    }
+
     /// Returns remaining data
     pub fn remaining(&self) -> &'a [u8] {
         self.remaining

@@ -9,7 +9,7 @@ use crate::timezone::{
 
 /// Parse time zone designation
 fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], TzStringError> {
-    match cursor.remaining().get(0) {
+    match cursor.peek() {
         Some(b'<') => {}
         _ => return Ok(cursor.read_while(u8::is_ascii_alphabetic)?),
     }
@@ -41,7 +41,7 @@ fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
 /// Parse signed hours, minutes and seconds
 fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzStringError> {
     let mut sign = 1;
-    if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.remaining().get(0) {
+    if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.peek() {
         cursor.read_exact(1)?;
         if c == b'-' {
             sign = -1;
@@ -71,7 +71,7 @@ fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 
 /// Parse transition rule day
 fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
-    match cursor.remaining().get(0) {
+    match cursor.peek() {
         Some(b'J') => {
             cursor.read_exact(1)?;
             Ok(RuleDay::Julian1WithoutLeap(Julian1WithoutLeap::new(cursor.read_int()?)?))
@@ -164,7 +164,7 @@ pub(crate) fn parse_posix_tz(
 
     let dst_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
 
-    let dst_offset = match cursor.remaining().get(0) {
+    let dst_offset = match cursor.peek() {
         Some(&b',') => std_offset - 3600,
         Some(_) => parse_offset(&mut cursor)?,
         None => {
