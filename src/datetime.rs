@@ -1,11 +1,8 @@
 //! Types related to a date time.
 
-use crate::constants::{
-    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_100_YEARS, DAYS_PER_400_YEARS, DAYS_PER_4_YEARS,
-    DAYS_PER_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH,
-    DAY_IN_MONTHS_NORMAL_YEAR, HOURS_PER_DAY, MINUTES_PER_HOUR, MONTHS_PER_YEAR,
-    NANOSECONDS_PER_SECOND, OFFSET_YEAR, SECONDS_PER_DAY, SECONDS_PER_HOUR, SECONDS_PER_MINUTE,
-    UNIX_OFFSET_SECS,
+use super::{
+    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, HOURS_PER_DAY,
+    SECONDS_PER_DAY, SECONDS_PER_HOUR,
 };
 use crate::error::{
     DateTimeError, FindLocalTimeTypeError, OutOfRangeError, ProjectDateTimeError, TzError,
@@ -560,6 +557,30 @@ fn format_date_time(
 
     Ok(())
 }
+
+/// Number of nanoseconds in one second
+const NANOSECONDS_PER_SECOND: u32 = 1_000_000_000;
+/// Number of seconds in one minute
+const SECONDS_PER_MINUTE: i64 = 60;
+/// Number of minutes in one hour
+const MINUTES_PER_HOUR: i64 = 60;
+/// Number of months in one year
+const MONTHS_PER_YEAR: i64 = 12;
+/// Number of days in a normal year
+const DAYS_PER_NORMAL_YEAR: i64 = 365;
+/// Number of days in 4 years (including 1 leap year)
+const DAYS_PER_4_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 4 + 1;
+/// Number of days in 100 years (including 24 leap years)
+const DAYS_PER_100_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 100 + 24;
+/// Number of days in 400 years (including 97 leap years)
+const DAYS_PER_400_YEARS: i64 = DAYS_PER_NORMAL_YEAR * 400 + 97;
+/// Unix time at `2000-03-01T00:00:00Z` (Wednesday)
+const UNIX_OFFSET_SECS: i64 = 951868800;
+/// Offset year
+const OFFSET_YEAR: i64 = 2000;
+/// Month days in a leap year from March
+const DAY_IN_MONTHS_LEAP_YEAR_FROM_MARCH: [i64; 12] =
+    [31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29];
 
 #[cfg(test)]
 mod test {

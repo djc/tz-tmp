@@ -1,8 +1,7 @@
 //! Types related to a time zone.
 
-use crate::constants::{
-    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, SECONDS_PER_28_DAYS,
-    SECONDS_PER_DAY, SECONDS_PER_WEEK,
+use super::{
+    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, SECONDS_PER_DAY,
 };
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::{
@@ -944,6 +943,11 @@ impl TimeZone {
         self.as_ref().find_local_time_type(unix_time)
     }
 }
+
+/// Number of seconds in one week
+const SECONDS_PER_WEEK: i64 = SECONDS_PER_DAY * DAYS_PER_WEEK;
+/// Number of seconds in 28 days
+const SECONDS_PER_28_DAYS: i64 = SECONDS_PER_DAY * 28;
 
 #[cfg(test)]
 mod test {

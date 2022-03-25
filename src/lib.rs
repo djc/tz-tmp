@@ -121,7 +121,6 @@
 //! # }
 //! ```
 
-mod constants;
 mod parse;
 
 pub mod datetime;
@@ -131,3 +130,18 @@ pub mod timezone;
 pub use datetime::{DateTime, UtcDateTime};
 pub use error::TzError;
 pub use timezone::{TimeZone, TimeZoneRef};
+
+/// Number of hours in one day
+const HOURS_PER_DAY: i64 = 24;
+/// Number of seconds in one hour
+const SECONDS_PER_HOUR: i64 = 3600;
+/// Number of seconds in one day
+const SECONDS_PER_DAY: i64 = SECONDS_PER_HOUR * HOURS_PER_DAY;
+/// Number of days in one week
+const DAYS_PER_WEEK: i64 = 7;
+
+/// Month days in a normal year
+const DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+/// Cumulated month days in a normal year
+const CUMUL_DAY_IN_MONTHS_NORMAL_YEAR: [i64; 12] =
+    [0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334];
