@@ -54,13 +54,12 @@ fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
     };
 
     cursor.read_exact(15)?;
-
-    let ut_local_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let std_wall_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let leap_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let transition_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let type_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
-    let char_count = u32::from_be_bytes(cursor.read_exact(4)?.try_into()?);
+    let ut_local_count = cursor.read_be_u32()?;
+    let std_wall_count = cursor.read_be_u32()?;
+    let leap_count = cursor.read_be_u32()?;
+    let transition_count = cursor.read_be_u32()?;
+    let type_count = cursor.read_be_u32()?;
+    let char_count = cursor.read_be_u32()?;
 
     if !(type_count != 0
         && char_count != 0

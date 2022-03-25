@@ -1,6 +1,6 @@
 //! Parsing functions.
 
-use crate::error::TzStringError;
+use crate::error::{TzFileError, TzStringError};
 
 mod tz_file;
 pub(crate) use tz_file::parse_tz_file;
@@ -8,6 +8,7 @@ pub(crate) use tz_file::parse_tz_file;
 mod tz_string;
 pub(crate) use tz_string::parse_posix_tz;
 
+use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
@@ -39,6 +40,10 @@ impl<'a> Cursor<'a> {
     /// Returns `true` if data is remaining
     pub fn is_empty(&self) -> bool {
         self.remaining.is_empty()
+    }
+
+    pub fn read_be_u32(&mut self) -> Result<u32, TzFileError> {
+        Ok(u32::from_be_bytes(self.read_exact(4)?.try_into()?))
     }
 
     /// Read exactly `count` bytes, reducing remaining data and incrementing read count
