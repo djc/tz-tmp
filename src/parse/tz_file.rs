@@ -372,7 +372,7 @@ mod test {
                 LocalTimeType::new(-36000, false, Some(b"HST"))?,
             ],
             Vec::new(),
-            Some(TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?)),
+            Some(TransitionRule::from(LocalTimeType::new(-36000, false, Some(b"HST"))?)),
         )?;
 
         assert_eq!(time_zone, time_zone_result);
@@ -399,7 +399,7 @@ mod test {
             vec![Transition::new(2145916800, 0)],
             vec![LocalTimeType::new(7200, false, Some(b"IST"))?],
             Vec::new(),
-            Some(TransitionRule::Alternate(AlternateTime::new(
+            Some(TransitionRule::from(AlternateTime::new(
                 LocalTimeType::new(7200, false, Some(b"IST"))?,
                 LocalTimeType::new(10800, true, Some(b"IDT"))?,
                 RuleDay::from(MonthWeekDay::new(3, 4, 4)?),

@@ -157,7 +157,7 @@ pub(crate) fn parse_posix_tz(
     let std_offset = parse_offset(&mut cursor)?;
 
     if cursor.is_empty() {
-        return Ok(TransitionRule::Fixed(LocalTimeType::new(-std_offset, false, std_time_zone)?));
+        return Ok(LocalTimeType::new(-std_offset, false, std_time_zone)?.into());
     }
 
     let dst_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
@@ -189,14 +189,15 @@ pub(crate) fn parse_posix_tz(
         return Err(TzStringError::InvalidTzString("remaining data after parsing TZ string").into());
     }
 
-    Ok(TransitionRule::Alternate(AlternateTime::new(
+    Ok(AlternateTime::new(
         LocalTimeType::new(-std_offset, false, std_time_zone)?,
         LocalTimeType::new(-dst_offset, true, dst_time_zone)?,
         dst_start,
         dst_start_time,
         dst_end,
         dst_end_time,
-    )?))
+    )?
+    .into())
 }
 
 #[cfg(test)]
@@ -205,123 +206,109 @@ mod test {
     use crate::error::{TzError, TzStringError};
     use crate::timezone::{
         AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay,
-        TransitionRule,
     };
 
     #[test]
     fn test_no_dst() -> Result<(), TzError> {
         let tz_string = b"HST10";
-
         let transition_rule = parse_posix_tz(tz_string, false)?;
-        let transition_rule_result =
-            TransitionRule::Fixed(LocalTimeType::new(-36000, false, Some(b"HST"))?);
-
-        assert_eq!(transition_rule, transition_rule_result);
-
+        assert_eq!(transition_rule, LocalTimeType::new(-36000, false, Some(b"HST"))?.into());
         Ok(())
     }
 
     #[test]
     fn test_quoted() -> Result<(), TzError> {
-        let tz_string = b"<-03>+3<+03>-3,J1,J365";
-
-        let transition_rule = parse_posix_tz(tz_string, false)?;
-
-        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-10800, false, Some(b"-03"))?,
-            LocalTimeType::new(10800, true, Some(b"+03"))?,
-            RuleDay::from(Julian1WithoutLeap::new(1)?),
-            7200,
-            RuleDay::from(Julian1WithoutLeap::new(365)?),
-            7200,
-        )?);
-
-        assert_eq!(transition_rule, transition_rule_result);
-
+        let transition_rule = parse_posix_tz(b"<-03>+3<+03>-3,J1,J365", false)?;
+        assert_eq!(
+            transition_rule,
+            AlternateTime::new(
+                LocalTimeType::new(-10800, false, Some(b"-03"))?,
+                LocalTimeType::new(10800, true, Some(b"+03"))?,
+                RuleDay::from(Julian1WithoutLeap::new(1)?),
+                7200,
+                RuleDay::from(Julian1WithoutLeap::new(365)?),
+                7200,
+            )?
+            .into()
+        );
         Ok(())
     }
 
     #[test]
     fn test_full() -> Result<(), TzError> {
         let tz_string = b"NZST-12:00:00NZDT-13:00:00,M10.1.0/02:00:00,M3.3.0/02:00:00";
-
         let transition_rule = parse_posix_tz(tz_string, false)?;
-
-        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(43200, false, Some(b"NZST"))?,
-            LocalTimeType::new(46800, true, Some(b"NZDT"))?,
-            RuleDay::from(MonthWeekDay::new(10, 1, 0)?),
-            7200,
-            RuleDay::from(MonthWeekDay::new(3, 3, 0)?),
-            7200,
-        )?);
-
-        assert_eq!(transition_rule, transition_rule_result);
-
+        assert_eq!(
+            transition_rule,
+            AlternateTime::new(
+                LocalTimeType::new(43200, false, Some(b"NZST"))?,
+                LocalTimeType::new(46800, true, Some(b"NZDT"))?,
+                RuleDay::from(MonthWeekDay::new(10, 1, 0)?),
+                7200,
+                RuleDay::from(MonthWeekDay::new(3, 3, 0)?),
+                7200,
+            )?
+            .into()
+        );
         Ok(())
     }
 
     #[test]
     fn test_negative_dst() -> Result<(), TzError> {
         let tz_string = b"IST-1GMT0,M10.5.0,M3.5.0/1";
-
         let transition_rule = parse_posix_tz(tz_string, false)?;
-
-        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(3600, false, Some(b"IST"))?,
-            LocalTimeType::new(0, true, Some(b"GMT"))?,
-            RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
-            7200,
-            RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
-            3600,
-        )?);
-
-        assert_eq!(transition_rule, transition_rule_result);
-
+        assert_eq!(
+            transition_rule,
+            AlternateTime::new(
+                LocalTimeType::new(3600, false, Some(b"IST"))?,
+                LocalTimeType::new(0, true, Some(b"GMT"))?,
+                RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+                7200,
+                RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
+                3600,
+            )?
+            .into()
+        );
         Ok(())
     }
 
     #[test]
     fn test_negative_hour() -> Result<(), TzError> {
         let tz_string = b"<-03>3<-02>,M3.5.0/-2,M10.5.0/-1";
-
         assert!(parse_posix_tz(tz_string, false).is_err());
 
-        let transition_rule = parse_posix_tz(tz_string, true)?;
-
-        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-10800, false, Some(b"-03"))?,
-            LocalTimeType::new(-7200, true, Some(b"-02"))?,
-            RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
-            -7200,
-            RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
-            -3600,
-        )?);
-
-        assert_eq!(transition_rule, transition_rule_result);
-
+        assert_eq!(
+            parse_posix_tz(tz_string, true)?,
+            AlternateTime::new(
+                LocalTimeType::new(-10800, false, Some(b"-03"))?,
+                LocalTimeType::new(-7200, true, Some(b"-02"))?,
+                RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
+                -7200,
+                RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+                -3600,
+            )?
+            .into()
+        );
         Ok(())
     }
 
     #[test]
     fn test_all_year_dst() -> Result<(), TzError> {
         let tz_string = b"EST5EDT,0/0,J365/25";
-
         assert!(parse_posix_tz(tz_string, false).is_err());
 
-        let transition_rule = parse_posix_tz(tz_string, true)?;
-
-        let transition_rule_result = TransitionRule::Alternate(AlternateTime::new(
-            LocalTimeType::new(-18000, false, Some(b"EST"))?,
-            LocalTimeType::new(-14400, true, Some(b"EDT"))?,
-            RuleDay::from(Julian0WithLeap::new(0)?),
-            0,
-            RuleDay::from(Julian1WithoutLeap::new(365)?),
-            90000,
-        )?);
-
-        assert_eq!(transition_rule, transition_rule_result);
-
+        assert_eq!(
+            parse_posix_tz(tz_string, true)?,
+            AlternateTime::new(
+                LocalTimeType::new(-18000, false, Some(b"EST"))?,
+                LocalTimeType::new(-14400, true, Some(b"EDT"))?,
+                RuleDay::from(Julian0WithLeap::new(0)?),
+                0,
+                RuleDay::from(Julian1WithoutLeap::new(365)?),
+                90000,
+            )?
+            .into()
+        );
         Ok(())
     }
 

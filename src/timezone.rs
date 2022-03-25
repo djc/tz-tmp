@@ -573,6 +573,18 @@ impl TransitionRule {
     }
 }
 
+impl From<LocalTimeType> for TransitionRule {
+    fn from(inner: LocalTimeType) -> Self {
+        Self::Fixed(inner)
+    }
+}
+
+impl From<AlternateTime> for TransitionRule {
+    fn from(inner: AlternateTime) -> Self {
+        Self::Alternate(inner)
+    }
+}
+
 /// Time zone
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TimeZone {
@@ -1017,10 +1029,10 @@ mod test {
 
     #[test]
     fn test_transition_rule() -> Result<(), crate::TzError> {
-        let transition_rule_fixed = TransitionRule::Fixed(LocalTimeType::new(-36000, false, None)?);
+        let transition_rule_fixed = TransitionRule::from(LocalTimeType::new(-36000, false, None)?);
         assert_eq!(transition_rule_fixed.find_local_time_type(0)?.ut_offset(), -36000);
 
-        let transition_rule_dst = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(43200, false, Some(b"NZST"))?,
             LocalTimeType::new(46800, true, Some(b"NZDT"))?,
             RuleDay::from(MonthWeekDay::new(10, 1, 0)?),
@@ -1034,7 +1046,7 @@ mod test {
         assert_eq!(transition_rule_dst.find_local_time_type(970322399)?.ut_offset(), 43200);
         assert_eq!(transition_rule_dst.find_local_time_type(970322400)?.ut_offset(), 46800);
 
-        let transition_rule_negative_dst = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_negative_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(3600, false, Some(b"IST"))?,
             LocalTimeType::new(0, true, Some(b"GMT"))?,
             RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
@@ -1048,7 +1060,7 @@ mod test {
         assert_eq!(transition_rule_negative_dst.find_local_time_type(972781199)?.ut_offset(), 3600);
         assert_eq!(transition_rule_negative_dst.find_local_time_type(972781200)?.ut_offset(), 0);
 
-        let transition_rule_negative_time_1 = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_negative_time_1 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(0, false, None)?,
             LocalTimeType::new(0, true, None)?,
             RuleDay::from(Julian0WithLeap::new(100)?),
@@ -1062,7 +1074,7 @@ mod test {
         assert!(!transition_rule_negative_time_1.find_local_time_type(8639999)?.is_dst());
         assert!(transition_rule_negative_time_1.find_local_time_type(8640000)?.is_dst());
 
-        let transition_rule_negative_time_2 = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_negative_time_2 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-10800, false, Some(b"-03"))?,
             LocalTimeType::new(-7200, true, Some(b"-02"))?,
             RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
@@ -1088,7 +1100,7 @@ mod test {
             -10800
         );
 
-        let transition_rule_all_year_dst = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_all_year_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-18000, false, Some(b"EST"))?,
             LocalTimeType::new(-14400, true, Some(b"EDT"))?,
             RuleDay::from(Julian0WithLeap::new(0)?),
@@ -1111,7 +1123,7 @@ mod test {
 
     #[test]
     fn test_transition_rule_overflow() -> Result<(), crate::TzError> {
-        let transition_rule_1 = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_1 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-1, false, None)?,
             LocalTimeType::new(-1, true, None)?,
             RuleDay::from(Julian1WithoutLeap::new(365)?),
@@ -1120,7 +1132,7 @@ mod test {
             0,
         )?);
 
-        let transition_rule_2 = TransitionRule::Alternate(AlternateTime::new(
+        let transition_rule_2 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(1, false, None)?,
             LocalTimeType::new(1, true, None)?,
             RuleDay::from(Julian1WithoutLeap::new(365)?),
@@ -1150,7 +1162,7 @@ mod test {
         let cet = LocalTimeType::with_ut_offset(3600)?;
 
         let utc_local_time_types = vec![utc];
-        let fixed_extra_rule = TransitionRule::Fixed(cet);
+        let fixed_extra_rule = TransitionRule::from(cet);
 
         let time_zone_1 = TimeZone::new(vec![], utc_local_time_types.clone(), vec![], None)?;
         let time_zone_2 =
@@ -1269,7 +1281,7 @@ mod test {
             vec![Transition::new(i64::MIN, 0)],
             vec![LocalTimeType::utc()],
             vec![LeapSecond::new(0, 1)],
-            Some(TransitionRule::Fixed(LocalTimeType::utc())),
+            Some(TransitionRule::from(LocalTimeType::utc())),
         );
         assert!(time_zone_err.is_err());
 
