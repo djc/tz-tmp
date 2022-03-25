@@ -567,21 +567,19 @@ fn format_date_time(
         year, month, month_day, hour, minute, second, nanoseconds
     )?;
 
-    if ut_offset != 0 {
-        let ut_offset = ut_offset as i64;
-        let ut_offset_abs = ut_offset.abs();
+    if ut_offset == 0 {
+        return write!(f, "Z");
+    }
 
-        let offset_hour = ut_offset / SECONDS_PER_HOUR;
-        let offset_minute = (ut_offset_abs / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
-        let offset_second = ut_offset_abs % SECONDS_PER_MINUTE;
+    let ut_offset = ut_offset as i64;
+    let ut_offset_abs = ut_offset.abs();
+    let offset_hour = ut_offset / SECONDS_PER_HOUR;
+    let offset_minute = (ut_offset_abs / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
+    let offset_second = ut_offset_abs % SECONDS_PER_MINUTE;
+    write!(f, "{:+03}:{:02}", offset_hour, offset_minute)?;
 
-        write!(f, "{:+03}:{:02}", offset_hour, offset_minute)?;
-
-        if offset_second != 0 {
-            write!(f, ":{:02}", offset_second)?;
-        }
-    } else {
-        write!(f, "Z")?;
+    if offset_second != 0 {
+        write!(f, ":{:02}", offset_second)?;
     }
 
     Ok(())
