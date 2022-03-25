@@ -123,20 +123,21 @@
 
 #![warn(unreachable_pub)]
 
-pub mod datetime;
-pub mod error;
-pub mod timezone;
-
-pub use datetime::{DateTime, UtcDateTime};
-pub use error::TzError;
-pub use timezone::{TimeZone, TimeZoneRef};
-
-use crate::error::{TzFileError, TzStringError};
-
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
+
+use crate::error::{TzFileError, TzStringError};
+
+mod datetime;
+pub use datetime::{DateTime, UtcDateTime};
+
+mod error;
+pub use error::TzError;
+
+mod timezone;
+pub use timezone::{TimeZone, TimeZoneRef};
 
 /// A `Cursor` contains a slice of a buffer and a read count.
 #[derive(Debug, Eq, PartialEq)]

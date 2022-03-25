@@ -1,13 +1,10 @@
 //! Error types.
 
 use std::array::TryFromSliceError;
-use std::error;
-use std::fmt;
-use std::io;
-use std::num::ParseIntError;
-use std::num::TryFromIntError;
+use std::num::{ParseIntError, TryFromIntError};
 use std::str::Utf8Error;
 use std::time::SystemTimeError;
+use std::{error, fmt, io};
 
 /// Unified error type for parsing a TZ string
 #[non_exhaustive]

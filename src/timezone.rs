@@ -1,22 +1,21 @@
 //! Types related to a time zone.
 
-use super::{
-    Cursor, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
-    SECONDS_PER_DAY,
-};
-use crate::datetime::{days_since_unix_epoch, is_leap_year};
-use crate::error::{
-    FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
-    TransitionRuleError, TzError, TzFileError, TzStringError,
-};
-use crate::UtcDateTime;
-
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::time::SystemTime;
 use std::{fmt, iter, str};
+
+use super::{
+    Cursor, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    SECONDS_PER_DAY,
+};
+use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
+use crate::error::{
+    FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
+    TransitionRuleError, TzError, TzFileError, TzStringError,
+};
 
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]

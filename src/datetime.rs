@@ -1,5 +1,10 @@
 //! Types related to a date time.
 
+use std::cmp::Ordering;
+use std::convert::{TryFrom, TryInto};
+use std::fmt;
+use std::time::SystemTime;
+
 use super::{
     CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, HOURS_PER_DAY,
     SECONDS_PER_DAY, SECONDS_PER_HOUR,
@@ -8,11 +13,6 @@ use crate::error::{
     DateTimeError, FindLocalTimeTypeError, OutOfRangeError, ProjectDateTimeError, TzError,
 };
 use crate::timezone::{LocalTimeType, TimeZoneRef};
-
-use std::cmp::Ordering;
-use std::convert::{TryFrom, TryInto};
-use std::fmt;
-use std::time::SystemTime;
 
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
