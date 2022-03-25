@@ -6,8 +6,6 @@ use crate::error::{TzError, TzFileError};
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
 
 use std::convert::TryInto;
-use std::fs::File;
-use std::io;
 use std::iter;
 use std::str;
 
@@ -263,31 +261,6 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
             let footer = cursor.remaining();
 
             Ok(data_block.parse(&header, Some(footer))?)
-        }
-    }
-}
-
-/// Open the TZif file corresponding to a TZ string
-pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
-    // Don't check system timezone directories on non-UNIX platforms
-    #[cfg(not(unix))]
-    return Ok(File::open(tz_string)?);
-
-    #[cfg(unix)]
-    {
-        // Possible system timezone directories
-        const ZONE_INFO_DIRECTORIES: [&str; 3] =
-            ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
-
-        if tz_string.starts_with('/') {
-            Ok(File::open(tz_string)?)
-        } else {
-            for folder in &ZONE_INFO_DIRECTORIES {
-                if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
-                    return Ok(file);
-                }
-            }
-            Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
         }
     }
 }

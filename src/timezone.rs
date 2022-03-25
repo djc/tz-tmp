@@ -6,18 +6,17 @@ use super::{
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::{
     FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
-    TransitionRuleError, TzError, TzStringError,
+    TransitionRuleError, TzError, TzFileError, TzStringError,
 };
-use crate::parse::{get_tz_file, parse_posix_tz, parse_tz_file};
+use crate::parse::{parse_posix_tz, parse_tz_file};
 use crate::UtcDateTime;
 
 use std::cmp::Ordering;
 use std::convert::TryInto;
-use std::fmt;
 use std::fs::{self, File};
 use std::io::{self, Read};
-use std::str;
 use std::time::SystemTime;
+use std::{fmt, str};
 
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -971,6 +970,31 @@ impl TimeZone {
         unix_time: i64,
     ) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
         self.as_ref().find_local_time_type(unix_time)
+    }
+}
+
+/// Open the TZif file corresponding to a TZ string
+pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
+    // Don't check system timezone directories on non-UNIX platforms
+    #[cfg(not(unix))]
+    return Ok(File::open(tz_string)?);
+
+    #[cfg(unix)]
+    {
+        // Possible system timezone directories
+        const ZONE_INFO_DIRECTORIES: [&str; 3] =
+            ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
+
+        if tz_string.starts_with('/') {
+            Ok(File::open(tz_string)?)
+        } else {
+            for folder in &ZONE_INFO_DIRECTORIES {
+                if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
+                    return Ok(file);
+                }
+            }
+            Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
+        }
     }
 }
 
