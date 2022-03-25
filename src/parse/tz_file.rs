@@ -39,45 +39,46 @@ struct Header {
     char_count: usize,
 }
 
-/// Parse TZif header
-fn parse_header(cursor: &mut Cursor) -> Result<Header, TzFileError> {
-    let magic = cursor.read_exact(4)?;
-    if magic != *b"TZif" {
-        return Err(TzFileError::InvalidTzFile("invalid magic number"));
+impl Header {
+    fn new(cursor: &mut Cursor) -> Result<Self, TzFileError> {
+        let magic = cursor.read_exact(4)?;
+        if magic != *b"TZif" {
+            return Err(TzFileError::InvalidTzFile("invalid magic number"));
+        }
+
+        let version = match cursor.read_exact(1)? {
+            [0x00] => Version::V1,
+            [0x32] => Version::V2,
+            [0x33] => Version::V3,
+            _ => return Err(TzFileError::UnsupportedTzFile("unsupported TZif version")),
+        };
+
+        cursor.read_exact(15)?;
+        let ut_local_count = cursor.read_be_u32()?;
+        let std_wall_count = cursor.read_be_u32()?;
+        let leap_count = cursor.read_be_u32()?;
+        let transition_count = cursor.read_be_u32()?;
+        let type_count = cursor.read_be_u32()?;
+        let char_count = cursor.read_be_u32()?;
+
+        if !(type_count != 0
+            && char_count != 0
+            && (ut_local_count == 0 || ut_local_count == type_count)
+            && (std_wall_count == 0 || std_wall_count == type_count))
+        {
+            return Err(TzFileError::InvalidTzFile("invalid header"));
+        }
+
+        Ok(Self {
+            version,
+            ut_local_count: ut_local_count as usize,
+            std_wall_count: std_wall_count as usize,
+            leap_count: leap_count as usize,
+            transition_count: transition_count as usize,
+            type_count: type_count as usize,
+            char_count: char_count as usize,
+        })
     }
-
-    let version = match cursor.read_exact(1)? {
-        [0x00] => Version::V1,
-        [0x32] => Version::V2,
-        [0x33] => Version::V3,
-        _ => return Err(TzFileError::UnsupportedTzFile("unsupported TZif version")),
-    };
-
-    cursor.read_exact(15)?;
-    let ut_local_count = cursor.read_be_u32()?;
-    let std_wall_count = cursor.read_be_u32()?;
-    let leap_count = cursor.read_be_u32()?;
-    let transition_count = cursor.read_be_u32()?;
-    let type_count = cursor.read_be_u32()?;
-    let char_count = cursor.read_be_u32()?;
-
-    if !(type_count != 0
-        && char_count != 0
-        && (ut_local_count == 0 || ut_local_count == type_count)
-        && (std_wall_count == 0 || std_wall_count == type_count))
-    {
-        return Err(TzFileError::InvalidTzFile("invalid header"));
-    }
-
-    Ok(Header {
-        version,
-        ut_local_count: ut_local_count as usize,
-        std_wall_count: std_wall_count as usize,
-        leap_count: leap_count as usize,
-        transition_count: transition_count as usize,
-        type_count: type_count as usize,
-        char_count: char_count as usize,
-    })
 }
 
 /// Parse TZif footer
@@ -239,7 +240,7 @@ impl<'a> DataBlock<'a> {
 /// Parse TZif file as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536)
 pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
     let mut cursor = Cursor::new(bytes);
-    let header = parse_header(&mut cursor)?;
+    let header = Header::new(&mut cursor)?;
     let data_block = DataBlock::new(&mut cursor, &header, Version::V1)?;
     match header.version {
         Version::V1 => match cursor.is_empty() {
@@ -252,7 +253,7 @@ pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
             }
         },
         Version::V2 | Version::V3 => {
-            let header = parse_header(&mut cursor)?;
+            let header = Header::new(&mut cursor)?;
             let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
             data_block.parse(Some(cursor.remaining()))
         }
