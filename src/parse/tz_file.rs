@@ -104,6 +104,7 @@ fn parse_footer(
 
 /// TZif data blocks
 struct DataBlock<'a> {
+    header: &'a Header,
     /// Time size in bytes
     time_size: usize,
     /// Transition times data block
@@ -126,7 +127,7 @@ impl<'a> DataBlock<'a> {
     /// Read TZif data blocks
     fn new(
         cursor: &mut Cursor<'a>,
-        header: &Header,
+        header: &'a Header,
         version: Version,
     ) -> Result<Self, TzFileError> {
         let time_size = match version {
@@ -135,6 +136,7 @@ impl<'a> DataBlock<'a> {
         };
 
         Ok(Self {
+            header,
             time_size,
             transition_times: cursor.read_exact(header.transition_count * time_size)?,
             transition_types: cursor.read_exact(header.transition_count)?,
@@ -155,17 +157,18 @@ impl<'a> DataBlock<'a> {
     }
 
     /// Parse time zone data
-    fn parse(&self, header: &Header, footer: Option<&[u8]>) -> Result<TimeZone, TzError> {
-        let mut transitions = Vec::with_capacity(header.transition_count);
+    fn parse(&self, footer: Option<&[u8]>) -> Result<TimeZone, TzError> {
+        let mut transitions = Vec::with_capacity(self.header.transition_count);
         for (arr_time, &local_time_type_index) in
             self.transition_times.chunks_exact(self.time_size).zip(self.transition_types)
         {
-            let unix_leap_time = self.parse_time(&arr_time[0..self.time_size], header.version)?;
+            let unix_leap_time =
+                self.parse_time(&arr_time[0..self.time_size], self.header.version)?;
             let local_time_type_index = local_time_type_index as usize;
             transitions.push(Transition::new(unix_leap_time, local_time_type_index));
         }
 
-        let mut local_time_types = Vec::with_capacity(header.type_count);
+        let mut local_time_types = Vec::with_capacity(self.header.type_count);
         for arr in self.local_time_types.chunks_exact(6) {
             let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
 
@@ -176,7 +179,7 @@ impl<'a> DataBlock<'a> {
             };
 
             let char_index = arr[5] as usize;
-            if char_index >= header.char_count {
+            if char_index >= self.header.char_count {
                 return Err(
                     TzFileError::InvalidTzFile("invalid time zone designation char index").into()
                 );
@@ -205,9 +208,9 @@ impl<'a> DataBlock<'a> {
             local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
         }
 
-        let mut leap_seconds = Vec::with_capacity(header.leap_count);
+        let mut leap_seconds = Vec::with_capacity(self.header.leap_count);
         for arr in self.leap_seconds.chunks_exact(self.time_size + 4) {
-            let unix_leap_time = self.parse_time(&arr[0..self.time_size], header.version)?;
+            let unix_leap_time = self.parse_time(&arr[0..self.time_size], self.header.version)?;
             let correction =
                 i32::from_be_bytes(arr[self.time_size..self.time_size + 4].try_into()?);
             leap_seconds.push(LeapSecond::new(unix_leap_time, correction));
@@ -215,7 +218,8 @@ impl<'a> DataBlock<'a> {
 
         let std_walls_iter = self.std_walls.iter().copied().chain(iter::repeat(0));
         let ut_locals_iter = self.ut_locals.iter().copied().chain(iter::repeat(0));
-        for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(header.type_count) {
+        for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(self.header.type_count)
+        {
             if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
                 return Err(TzFileError::InvalidTzFile(
                     "invalid couple of standard/wall and UT/local indicators",
@@ -225,7 +229,7 @@ impl<'a> DataBlock<'a> {
         }
 
         let extra_rule = footer
-            .and_then(|footer| parse_footer(footer, header.version == Version::V3).transpose())
+            .and_then(|footer| parse_footer(footer, self.header.version == Version::V3).transpose())
             .transpose()?;
 
         Ok(TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)?)
@@ -235,31 +239,22 @@ impl<'a> DataBlock<'a> {
 /// Parse TZif file as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536)
 pub(crate) fn parse_tz_file(bytes: &[u8]) -> Result<TimeZone, TzError> {
     let mut cursor = Cursor::new(bytes);
-
     let header = parse_header(&mut cursor)?;
-
+    let data_block = DataBlock::new(&mut cursor, &header, Version::V1)?;
     match header.version {
-        Version::V1 => {
-            let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
-
-            if !cursor.is_empty() {
+        Version::V1 => match cursor.is_empty() {
+            true => data_block.parse(None),
+            false => {
                 return Err(TzFileError::InvalidTzFile(
                     "remaining data after end of TZif v1 data block",
                 )
-                .into());
+                .into())
             }
-
-            Ok(data_block.parse(&header, None)?)
-        }
+        },
         Version::V2 | Version::V3 => {
-            // Skip v1 data block
-            DataBlock::new(&mut cursor, &header, Version::V1)?;
-
             let header = parse_header(&mut cursor)?;
             let data_block = DataBlock::new(&mut cursor, &header, header.version)?;
-            let footer = cursor.remaining();
-
-            Ok(data_block.parse(&header, Some(footer))?)
+            data_block.parse(Some(cursor.remaining()))
         }
     }
 }
