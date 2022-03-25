@@ -1130,33 +1130,34 @@ impl TimeZone {
             return Self::from_tz_data(&fs::read("/etc/localtime")?);
         }
 
-        let read = |mut file: File| -> io::Result<_> {
-            let mut bytes = Vec::new();
-            file.read_to_end(&mut bytes)?;
-            Ok(bytes)
-        };
-
         let mut chars = tz_string.chars();
         if chars.next() == Some(':') {
-            return Self::from_tz_data(&read(get_tz_file(chars.as_str())?)?);
+            return Self::from_file(&mut get_tz_file(chars.as_str())?);
         }
 
-        match get_tz_file(tz_string) {
-            Ok(file) => Self::from_tz_data(&read(file)?),
-            Err(_) => {
-                let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
-
-                // TZ string extensions are not allowed
-                let rule = TransitionRule::from_tz_string(tz_string.as_bytes(), false)?;
-
-                let local_time_types = match rule {
-                    TransitionRule::Fixed(local_time_type) => vec![local_time_type],
-                    TransitionRule::Alternate(AlternateTime { std, dst, .. }) => vec![std, dst],
-                };
-
-                Ok(TimeZone::new(vec![], local_time_types, vec![], Some(rule))?)
-            }
+        if let Ok(mut file) = get_tz_file(tz_string) {
+            return Self::from_file(&mut file);
         }
+
+        // TZ string extensions are not allowed
+        let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
+        let rule = TransitionRule::from_tz_string(tz_string.as_bytes(), false)?;
+        Ok(Self::new(
+            vec![],
+            match rule {
+                TransitionRule::Fixed(local_time_type) => vec![local_time_type],
+                TransitionRule::Alternate(AlternateTime { std, dst, .. }) => vec![std, dst],
+            },
+            vec![],
+            Some(rule),
+        )?)
+    }
+
+    /// Construct a time zone from the contents of a time zone file
+    pub fn from_file(file: &mut File) -> Result<Self, TzError> {
+        let mut bytes = Vec::new();
+        file.read_to_end(&mut bytes)?;
+        Self::from_tz_data(&bytes)
     }
 
     /// Find the current local time type associated to the time zone

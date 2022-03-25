@@ -14,6 +14,183 @@ use crate::error::{
 };
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 
+/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
+#[derive(Debug, Copy, Clone)]
+pub struct DateTime {
+    /// Year
+    year: i32,
+    /// Month in `[1, 12]`
+    month: u8,
+    /// Day of the month in `[1, 31]`
+    month_day: u8,
+    /// Hours since midnight in `[0, 23]`
+    hour: u8,
+    /// Minutes in `[0, 59]`
+    minute: u8,
+    /// Seconds in `[0, 60]`, with a possible leap second
+    second: u8,
+    /// Local time type
+    local_time_type: LocalTimeType,
+    /// UTC Unix time in seconds
+    unix_time: i64,
+    /// Nanoseconds in `[0, 999_999_999]`
+    nanoseconds: u32,
+}
+
+impl DateTime {
+    /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
+    pub fn from_timespec(
+        unix_time: i64,
+        nanoseconds: u32,
+        time_zone_ref: TimeZoneRef,
+    ) -> Result<Self, ProjectDateTimeError> {
+        let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
+            Ok(&local_time_type) => local_time_type,
+            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
+        };
+
+        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64)
+        {
+            Some(unix_time_with_offset) => unix_time_with_offset,
+            None => return Err(ProjectDateTimeError("out of range date time")),
+        };
+
+        let utc_date_time_with_offset =
+            match UtcDateTime::from_timespec(unix_time_with_offset, nanoseconds) {
+                Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
+                Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
+            };
+
+        let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } =
+            utc_date_time_with_offset;
+        Ok(Self {
+            year,
+            month,
+            month_day,
+            hour,
+            minute,
+            second,
+            local_time_type,
+            unix_time,
+            nanoseconds,
+        })
+    }
+
+    /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
+    pub fn from_total_nanoseconds(
+        total_nanoseconds: i128,
+        time_zone_ref: TimeZoneRef,
+    ) -> Result<Self, ProjectDateTimeError> {
+        match total_nanoseconds_to_timespec(total_nanoseconds) {
+            Ok((unix_time, nanoseconds)) => {
+                Self::from_timespec(unix_time, nanoseconds, time_zone_ref)
+            }
+            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
+        }
+    }
+
+    /// Returns the current date time associated to the specified time zone
+    pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
+        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
+        Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)?)
+    }
+
+    /// Project the date time into another time zone.
+    ///
+    /// Leap seconds are not preserved.
+    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+        Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
+    }
+
+    /// Returns year
+    pub fn year(&self) -> i32 {
+        self.year
+    }
+
+    /// Returns month in `[1, 12]`
+    pub fn month(&self) -> u8 {
+        self.month
+    }
+
+    /// Returns day of the month in `[1, 31]`
+    pub fn month_day(&self) -> u8 {
+        self.month_day
+    }
+
+    /// Returns hours since midnight in `[0, 23]`
+    pub fn hour(&self) -> u8 {
+        self.hour
+    }
+
+    /// Returns minutes in `[0, 59]`
+    pub fn minute(&self) -> u8 {
+        self.minute
+    }
+
+    /// Returns seconds in `[0, 60]`, with a possible leap second
+    pub fn second(&self) -> u8 {
+        self.second
+    }
+
+    /// Returns nanoseconds in `[0, 999_999_999]`
+    pub fn nanoseconds(&self) -> u32 {
+        self.nanoseconds
+    }
+
+    /// Returns days since Sunday in `[0, 6]`
+    pub const fn week_day(&self) -> u8 {
+        week_day(self.year, self.month as usize, self.month_day as i64)
+    }
+
+    /// Returns days since January 1 in `[0, 365]`
+    pub const fn year_day(&self) -> u16 {
+        year_day(self.year, self.month as usize, self.month_day as i64)
+    }
+
+    /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    pub fn total_nanoseconds(&self) -> i128 {
+        nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
+    }
+
+    /// Returns local time type
+    pub fn local_time_type(&self) -> &LocalTimeType {
+        &self.local_time_type
+    }
+
+    /// Returns UTC Unix time in seconds
+    pub fn unix_time(&self) -> i64 {
+        self.unix_time
+    }
+}
+
+impl PartialEq for DateTime {
+    fn eq(&self, other: &Self) -> bool {
+        (self.unix_time, self.nanoseconds) == (other.unix_time, other.nanoseconds)
+    }
+}
+
+impl PartialOrd for DateTime {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        (self.unix_time, self.nanoseconds).partial_cmp(&(other.unix_time, other.nanoseconds))
+    }
+}
+
+impl fmt::Display for DateTime {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        format_date_time(
+            f,
+            self.year,
+            self.month,
+            self.month_day,
+            self.hour,
+            self.minute,
+            self.second,
+            self.nanoseconds,
+            self.local_time_type().ut_offset(),
+        )
+    }
+}
+
 /// UTC date time exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub struct UtcDateTime {
@@ -31,22 +208,6 @@ pub struct UtcDateTime {
     second: u8,
     /// Nanoseconds in `[0, 999_999_999]`
     nanoseconds: u32,
-}
-
-impl fmt::Display for UtcDateTime {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        format_date_time(
-            f,
-            self.year,
-            self.month,
-            self.month_day,
-            self.hour,
-            self.minute,
-            self.second,
-            self.nanoseconds,
-            0,
-        )
-    }
 }
 
 impl UtcDateTime {
@@ -267,42 +428,7 @@ impl UtcDateTime {
     }
 }
 
-/// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
-#[derive(Debug, Copy, Clone)]
-pub struct DateTime {
-    /// Year
-    year: i32,
-    /// Month in `[1, 12]`
-    month: u8,
-    /// Day of the month in `[1, 31]`
-    month_day: u8,
-    /// Hours since midnight in `[0, 23]`
-    hour: u8,
-    /// Minutes in `[0, 59]`
-    minute: u8,
-    /// Seconds in `[0, 60]`, with a possible leap second
-    second: u8,
-    /// Local time type
-    local_time_type: LocalTimeType,
-    /// UTC Unix time in seconds
-    unix_time: i64,
-    /// Nanoseconds in `[0, 999_999_999]`
-    nanoseconds: u32,
-}
-
-impl PartialEq for DateTime {
-    fn eq(&self, other: &Self) -> bool {
-        (self.unix_time, self.nanoseconds) == (other.unix_time, other.nanoseconds)
-    }
-}
-
-impl PartialOrd for DateTime {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        (self.unix_time, self.nanoseconds).partial_cmp(&(other.unix_time, other.nanoseconds))
-    }
-}
-
-impl fmt::Display for DateTime {
+impl fmt::Display for UtcDateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         format_date_time(
             f,
@@ -313,134 +439,8 @@ impl fmt::Display for DateTime {
             self.minute,
             self.second,
             self.nanoseconds,
-            self.local_time_type().ut_offset(),
+            0,
         )
-    }
-}
-
-impl DateTime {
-    /// Construct a date time from a Unix time in seconds with nanoseconds and a time zone
-    pub fn from_timespec(
-        unix_time: i64,
-        nanoseconds: u32,
-        time_zone_ref: TimeZoneRef,
-    ) -> Result<Self, ProjectDateTimeError> {
-        let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
-            Ok(&local_time_type) => local_time_type,
-            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
-        };
-
-        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64)
-        {
-            Some(unix_time_with_offset) => unix_time_with_offset,
-            None => return Err(ProjectDateTimeError("out of range date time")),
-        };
-
-        let utc_date_time_with_offset =
-            match UtcDateTime::from_timespec(unix_time_with_offset, nanoseconds) {
-                Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
-                Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
-            };
-
-        let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } =
-            utc_date_time_with_offset;
-        Ok(Self {
-            year,
-            month,
-            month_day,
-            hour,
-            minute,
-            second,
-            local_time_type,
-            unix_time,
-            nanoseconds,
-        })
-    }
-
-    /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
-    pub fn from_total_nanoseconds(
-        total_nanoseconds: i128,
-        time_zone_ref: TimeZoneRef,
-    ) -> Result<Self, ProjectDateTimeError> {
-        match total_nanoseconds_to_timespec(total_nanoseconds) {
-            Ok((unix_time, nanoseconds)) => {
-                Self::from_timespec(unix_time, nanoseconds, time_zone_ref)
-            }
-            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
-        }
-    }
-
-    /// Returns the current date time associated to the specified time zone
-    pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, TzError> {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)?)
-    }
-
-    /// Project the date time into another time zone.
-    ///
-    /// Leap seconds are not preserved.
-    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
-        Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
-    }
-
-    /// Returns year
-    pub fn year(&self) -> i32 {
-        self.year
-    }
-
-    /// Returns month in `[1, 12]`
-    pub fn month(&self) -> u8 {
-        self.month
-    }
-
-    /// Returns day of the month in `[1, 31]`
-    pub fn month_day(&self) -> u8 {
-        self.month_day
-    }
-
-    /// Returns hours since midnight in `[0, 23]`
-    pub fn hour(&self) -> u8 {
-        self.hour
-    }
-
-    /// Returns minutes in `[0, 59]`
-    pub fn minute(&self) -> u8 {
-        self.minute
-    }
-
-    /// Returns seconds in `[0, 60]`, with a possible leap second
-    pub fn second(&self) -> u8 {
-        self.second
-    }
-
-    /// Returns nanoseconds in `[0, 999_999_999]`
-    pub fn nanoseconds(&self) -> u32 {
-        self.nanoseconds
-    }
-
-    /// Returns days since Sunday in `[0, 6]`
-    pub fn week_day(&self) -> u8 {
-        week_day(self.year, self.month as usize, self.month_day as i64)
-    }
-
-    /// Returns days since January 1 in `[0, 365]`
-    pub fn year_day(&self) -> u16 {
-        year_day(self.year, self.month as usize, self.month_day as i64)
-    }
-
-    /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-    pub fn total_nanoseconds(&self) -> i128 {
-        nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
-    }
-
-    /// Returns local time type
-    pub fn local_time_type(&self) -> &LocalTimeType {
-        &self.local_time_type
-    }
-
-    /// Returns UTC Unix time in seconds
-    pub fn unix_time(&self) -> i64 {
-        self.unix_time
     }
 }
 
