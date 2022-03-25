@@ -304,7 +304,6 @@ impl PartialOrd for DateTime {
 
 impl fmt::Display for DateTime {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let ut_offset = self.local_time_type().ut_offset();
         format_date_time(
             f,
             self.year,
@@ -314,7 +313,7 @@ impl fmt::Display for DateTime {
             self.minute,
             self.second,
             self.nanoseconds,
-            ut_offset,
+            self.local_time_type().ut_offset(),
         )
     }
 }
