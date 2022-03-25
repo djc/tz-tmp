@@ -1,14 +1,14 @@
 //! Types related to a time zone.
 
 use super::{
-    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, SECONDS_PER_DAY,
+    Cursor, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    SECONDS_PER_DAY,
 };
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::{
     FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
     TransitionRuleError, TzError, TzFileError, TzStringError,
 };
-use crate::parse::Cursor;
 use crate::UtcDateTime;
 
 use std::cmp::Ordering;
