@@ -2,9 +2,6 @@
 
 use crate::error::{TzFileError, TzStringError};
 
-mod tz_file;
-pub(crate) use tz_file::parse_tz_file;
-
 mod tz_string;
 pub(crate) use tz_string::parse_posix_tz;
 
