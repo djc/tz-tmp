@@ -69,26 +69,6 @@ fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     Ok(sign * (hour * 3600 + minute * 60 + second))
 }
 
-/// Parse transition rule day
-fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
-    match cursor.peek() {
-        Some(b'M') => {}
-        Some(b'J') => {
-            cursor.read_exact(1)?;
-            return Ok(Julian1WithoutLeap::new(cursor.read_int()?)?.into());
-        }
-        _ => return Ok(Julian0WithLeap::new(cursor.read_int()?)?.into()),
-    }
-
-    cursor.read_exact(1)?;
-    let month = cursor.read_int()?;
-    cursor.read_tag(b".")?;
-    let week = cursor.read_int()?;
-    cursor.read_tag(b".")?;
-    let week_day = cursor.read_int()?;
-    Ok(MonthWeekDay::new(month, week, week_day)?.into())
-}
-
 /// Parse transition rule time
 fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
@@ -128,19 +108,31 @@ fn parse_rule_block(
     cursor: &mut Cursor,
     use_string_extensions: bool,
 ) -> Result<(RuleDay, i32), TzError> {
-    let date = parse_rule_day(cursor)?;
-
-    let time = if cursor.read_optional_tag(b"/")? {
-        if use_string_extensions {
-            parse_rule_time_extended(cursor)?
-        } else {
-            parse_rule_time(cursor)?
+    let date = match cursor.peek() {
+        Some(b'M') => {
+            cursor.read_exact(1)?;
+            let month = cursor.read_int()?;
+            cursor.read_tag(b".")?;
+            let week = cursor.read_int()?;
+            cursor.read_tag(b".")?;
+            let week_day = cursor.read_int()?;
+            MonthWeekDay::new(month, week, week_day)?.into()
         }
-    } else {
-        2 * 3600
+        Some(b'J') => {
+            cursor.read_exact(1)?;
+            Julian1WithoutLeap::new(cursor.read_int()?)?.into()
+        }
+        _ => Julian0WithLeap::new(cursor.read_int()?)?.into(),
     };
 
-    Ok((date, time))
+    Ok((
+        date,
+        match (cursor.read_optional_tag(b"/")?, use_string_extensions) {
+            (false, _) => 2 * 3600,
+            (true, true) => parse_rule_time_extended(cursor)?,
+            (true, false) => parse_rule_time(cursor)?,
+        },
+    ))
 }
 
 /// Parse a POSIX TZ string containing a time zone description, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
