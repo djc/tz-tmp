@@ -17,15 +17,14 @@ fn parse_int<T: FromStr<Err = ParseIntError>>(bytes: &[u8]) -> Result<T, TzStrin
 
 /// Parse time zone designation
 fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], TzStringError> {
-    let unquoted = if cursor.remaining().get(0) == Some(&b'<') {
-        cursor.read_exact(1)?;
-        let unquoted = cursor.read_until(|&x| x == b'>')?;
-        cursor.read_exact(1)?;
-        unquoted
-    } else {
-        cursor.read_while(u8::is_ascii_alphabetic)?
-    };
+    match cursor.remaining().get(0) {
+        Some(b'<') => {}
+        _ => return Ok(cursor.read_while(u8::is_ascii_alphabetic)?),
+    }
 
+    cursor.read_exact(1)?;
+    let unquoted = cursor.read_until(|&x| x == b'>')?;
+    cursor.read_exact(1)?;
     Ok(unquoted)
 }
 
