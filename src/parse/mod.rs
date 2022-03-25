@@ -2,9 +2,6 @@
 
 use crate::error::{TzFileError, TzStringError};
 
-mod tz_string;
-pub(crate) use tz_string::parse_posix_tz;
-
 use std::convert::TryInto;
 use std::io::{Error, ErrorKind};
 use std::num::ParseIntError;
