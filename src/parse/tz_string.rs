@@ -216,8 +216,8 @@ pub(crate) fn parse_posix_tz(
 
 #[cfg(test)]
 mod test {
+    use super::parse_posix_tz;
     use crate::error::{TzError, TzStringError};
-    use crate::parse::parse_posix_tz;
     use crate::timezone::{
         AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay,
         TransitionRule,
