@@ -3,7 +3,7 @@
 use super::tz_string::parse_posix_tz;
 use super::Cursor;
 use crate::error::{TzError, TzFileError};
-use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
+use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition};
 
 use std::convert::TryInto;
 use std::iter;
@@ -78,28 +78,6 @@ impl Header {
             type_count: type_count as usize,
             char_count: char_count as usize,
         })
-    }
-}
-
-/// Parse TZif footer
-fn parse_footer(
-    footer: &[u8],
-    use_string_extensions: bool,
-) -> Result<Option<TransitionRule>, TzError> {
-    let footer = str::from_utf8(footer)?;
-    if !(footer.starts_with('\n') && footer.ends_with('\n')) {
-        return Err(TzFileError::InvalidTzFile("invalid footer").into());
-    }
-
-    let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
-    if tz_string.starts_with(':') || tz_string.contains('\0') {
-        return Err(TzFileError::InvalidTzFile("invalid footer").into());
-    }
-
-    if !tz_string.is_empty() {
-        Ok(Some(parse_posix_tz(tz_string.as_bytes(), use_string_extensions)).transpose()?)
-    } else {
-        Ok(None)
     }
 }
 
@@ -229,9 +207,28 @@ impl<'a> DataBlock<'a> {
             }
         }
 
-        let extra_rule = footer
-            .and_then(|footer| parse_footer(footer, self.header.version == Version::V3).transpose())
-            .transpose()?;
+        let extra_rule = match footer {
+            Some(footer) => {
+                let footer = str::from_utf8(footer)?;
+                if !(footer.starts_with('\n') && footer.ends_with('\n')) {
+                    return Err(TzFileError::InvalidTzFile("invalid footer").into());
+                }
+
+                let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
+                if tz_string.starts_with(':') || tz_string.contains('\0') {
+                    return Err(TzFileError::InvalidTzFile("invalid footer").into());
+                }
+
+                match tz_string.is_empty() {
+                    true => None,
+                    false => Some(parse_posix_tz(
+                        tz_string.as_bytes(),
+                        self.header.version == Version::V3,
+                    )?),
+                }
+            }
+            None => None,
+        };
 
         Ok(TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)?)
     }
