@@ -2,7 +2,10 @@
 
 use super::Cursor;
 use crate::error::{TzError, TzStringError};
-use crate::timezone::*;
+use crate::timezone::{
+    AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay,
+    TransitionRule,
+};
 
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
@@ -213,7 +216,12 @@ pub(crate) fn parse_posix_tz(
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use crate::error::{TzError, TzStringError};
+    use crate::parse::parse_posix_tz;
+    use crate::timezone::{
+        AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay,
+        TransitionRule,
+    };
 
     #[test]
     fn test_no_dst() -> Result<(), TzError> {

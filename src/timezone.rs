@@ -1,10 +1,16 @@
 //! Types related to a time zone.
 
+use crate::constants::{
+    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, SECONDS_PER_28_DAYS,
+    SECONDS_PER_DAY, SECONDS_PER_WEEK,
+};
 use crate::datetime::{days_since_unix_epoch, is_leap_year};
-use crate::error::*;
-use crate::parse::*;
+use crate::error::{
+    FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
+    TransitionRuleError, TzError, TzStringError,
+};
+use crate::parse::{get_tz_file, parse_posix_tz, parse_tz_file};
 use crate::UtcDateTime;
-use crate::constants::*;
 
 use std::cmp::Ordering;
 use std::convert::TryInto;
@@ -941,7 +947,11 @@ impl TimeZone {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use super::{
+        AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LeapSecond, LocalTimeType,
+        MonthWeekDay, RuleDay, TimeZone, Transition, TransitionRule, TzAsciiStr,
+    };
+    use crate::error::{FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TzError};
 
     #[test]
     fn test_tz_ascii_str() -> Result<(), crate::TzError> {

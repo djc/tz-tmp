@@ -3,7 +3,7 @@
 use super::tz_string::parse_posix_tz;
 use super::Cursor;
 use crate::error::{TzError, TzFileError};
-use crate::timezone::*;
+use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
 
 use std::convert::TryInto;
 use std::fs::File;
@@ -294,7 +294,12 @@ pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
 
 #[cfg(test)]
 mod test {
-    use super::*;
+    use crate::error::TzError;
+    use crate::parse::parse_tz_file;
+    use crate::timezone::{
+        AlternateTime, LeapSecond, LocalTimeType, MonthWeekDay, RuleDay, TimeZone, Transition,
+        TransitionRule,
+    };
 
     #[test]
     fn test_v1_file_with_leap_seconds() -> Result<(), TzError> {
