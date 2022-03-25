@@ -189,14 +189,6 @@ impl UtcDateTime {
         })
     }
 
-    /// Construct a UTC date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-    pub fn from_total_nanoseconds(total_nanoseconds: i128) -> Result<Self, OutOfRangeError> {
-        match total_nanoseconds_to_timespec(total_nanoseconds) {
-            Ok((unix_time, nanoseconds)) => Self::from_timespec(unix_time, nanoseconds),
-            Err(error) => Err(error),
-        }
-    }
-
     /// Returns the current UTC date time
     pub fn now() -> Result<Self, TzError> {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
