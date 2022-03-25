@@ -72,23 +72,21 @@ fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 /// Parse transition rule day
 fn parse_rule_day(cursor: &mut Cursor) -> Result<RuleDay, TzError> {
     match cursor.peek() {
+        Some(b'M') => {}
         Some(b'J') => {
             cursor.read_exact(1)?;
-            Ok(Julian1WithoutLeap::new(cursor.read_int()?)?.into())
+            return Ok(Julian1WithoutLeap::new(cursor.read_int()?)?.into());
         }
-        Some(b'M') => {
-            cursor.read_exact(1)?;
-
-            let month = cursor.read_int()?;
-            cursor.read_tag(b".")?;
-            let week = cursor.read_int()?;
-            cursor.read_tag(b".")?;
-            let week_day = cursor.read_int()?;
-
-            Ok(MonthWeekDay::new(month, week, week_day)?.into())
-        }
-        _ => Ok(Julian0WithLeap::new(cursor.read_int()?)?.into()),
+        _ => return Ok(Julian0WithLeap::new(cursor.read_int()?)?.into()),
     }
+
+    cursor.read_exact(1)?;
+    let month = cursor.read_int()?;
+    cursor.read_tag(b".")?;
+    let week = cursor.read_int()?;
+    cursor.read_tag(b".")?;
+    let week_day = cursor.read_int()?;
+    Ok(MonthWeekDay::new(month, week, week_day)?.into())
 }
 
 /// Parse transition rule time
