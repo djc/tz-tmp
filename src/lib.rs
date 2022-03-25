@@ -121,6 +121,8 @@
 //! # }
 //! ```
 
+#![warn(unreachable_pub)]
+
 mod parse;
 
 pub mod datetime;
