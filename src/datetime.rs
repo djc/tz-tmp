@@ -1,6 +1,7 @@
 //! Types related to a date time.
 
 use crate::error::*;
+use crate::constants::*;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 
 use std::cmp::Ordering;
@@ -64,8 +65,6 @@ impl UtcDateTime {
         second: u8,
         nanoseconds: u32,
     ) -> Result<Self, DateTimeError> {
-        use crate::constants::*;
-
         // Exclude the maximum possible UTC date time with a leap second
         if year == i32::MAX
             && month == 12
@@ -112,8 +111,6 @@ impl UtcDateTime {
 
     /// Construct a UTC date time from a Unix time in seconds and nanoseconds
     pub fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, OutOfRangeError> {
-        use crate::constants::*;
-
         let seconds = match unix_time.checked_sub(UNIX_OFFSET_SECS) {
             Some(seconds) => seconds,
             None => return Err(OutOfRangeError("out of range operation")),
@@ -203,8 +200,6 @@ impl UtcDateTime {
 
     /// Returns the Unix time in seconds associated to the UTC date time
     pub fn unix_time(&self) -> i64 {
-        use crate::constants::*;
-
         let mut result =
             days_since_unix_epoch(self.year, self.month as usize, self.month_day as i64);
         result *= HOURS_PER_DAY;
@@ -424,8 +419,6 @@ impl DateTime {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
-    use crate::constants::*;
-
     let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
     (4 + days_since_unix_epoch).rem_euclid(DAYS_PER_WEEK) as u8
 }
@@ -438,8 +431,6 @@ const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 const fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
-    use crate::constants::*;
-
     let leap = (month >= 3 && is_leap_year(year)) as i64;
     (CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1] + leap + month_day - 1) as u16
 }
@@ -457,8 +448,6 @@ pub(crate) const fn is_leap_year(year: i32) -> bool {
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
 pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
-    use crate::constants::*;
-
     let is_leap_year = is_leap_year(year);
 
     let year = year as i64;
@@ -490,8 +479,6 @@ pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i6
 
 /// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
 fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
-    use crate::constants::*;
-
     // Overflow is not possible
     unix_time as i128 * NANOSECONDS_PER_SECOND as i128 + nanoseconds as i128
 }
@@ -503,8 +490,6 @@ fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
 /// * `unix_time`: Unix time in seconds
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
 fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
-    use crate::constants::*;
-
     let unix_time =
         match i64::try_from(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
             Ok(unix_time) => unix_time,
@@ -542,8 +527,6 @@ fn format_date_time(
     nanoseconds: u32,
     ut_offset: i32,
 ) -> fmt::Result {
-    use crate::constants::*;
-
     write!(
         f,
         "{}-{:02}-{:02}T{:02}:{:02}:{:02}.{:09}",

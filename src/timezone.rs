@@ -4,6 +4,7 @@ use crate::datetime::{days_since_unix_epoch, is_leap_year};
 use crate::error::*;
 use crate::parse::*;
 use crate::UtcDateTime;
+use crate::constants::*;
 
 use std::cmp::Ordering;
 use std::convert::TryInto;
@@ -302,8 +303,6 @@ impl RuleDay {
     /// * `month`: Month in `[1, 12]`
     /// * `month_day`: Day of the month in `[1, 31]`
     fn transition_date(&self, year: i32) -> (usize, i64) {
-        use crate::constants::*;
-
         match *self {
             Self::Julian1WithoutLeap(Julian1WithoutLeap(year_day)) => {
                 let year_day = year_day as i64;
@@ -374,8 +373,6 @@ impl RuleDay {
 
     /// Returns the UTC Unix time in seconds associated to the transition date for the provided year
     fn unix_time(&self, year: i32, day_time_in_utc: i64) -> i64 {
-        use crate::constants::*;
-
         let (month, month_day) = self.transition_date(year);
         days_since_unix_epoch(year, month, month_day) * SECONDS_PER_DAY + day_time_in_utc
     }
@@ -408,8 +405,6 @@ impl AlternateTime {
         dst_end: RuleDay,
         dst_end_time: i32,
     ) -> Result<Self, TransitionRuleError> {
-        use crate::constants::*;
-
         // Overflow is not possible
         if !((dst_start_time as i64).abs() < SECONDS_PER_WEEK
             && (dst_end_time as i64).abs() < SECONDS_PER_WEEK)
@@ -691,8 +686,6 @@ impl<'a> TimeZoneRef<'a> {
 
     /// Check time zone inputs
     fn check_inputs(&self) -> Result<(), TimeZoneError> {
-        use crate::constants::*;
-
         // Check local time types
         let local_time_types_size = self.local_time_types.len();
         if local_time_types_size == 0 {
