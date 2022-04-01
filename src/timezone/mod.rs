@@ -14,191 +14,6 @@ use rule::{AlternateTime, TransitionRule};
 #[cfg(test)]
 mod tests;
 
-/// Transition of a TZif file
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Transition {
-    /// Unix leap time
-    unix_leap_time: i64,
-    /// Index specifying the local time type of the transition
-    local_time_type_index: usize,
-}
-
-impl Transition {
-    /// Construct a TZif file transition
-    pub fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
-        Self { unix_leap_time, local_time_type_index }
-    }
-
-    /// Returns Unix leap time
-    pub fn unix_leap_time(&self) -> i64 {
-        self.unix_leap_time
-    }
-
-    /// Returns local time type index
-    pub fn local_time_type_index(&self) -> usize {
-        self.local_time_type_index
-    }
-}
-
-/// Leap second of a TZif file
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LeapSecond {
-    /// Unix leap time
-    unix_leap_time: i64,
-    /// Leap second correction
-    correction: i32,
-}
-
-impl LeapSecond {
-    /// Construct a TZif file leap second
-    pub fn new(unix_leap_time: i64, correction: i32) -> Self {
-        Self { unix_leap_time, correction }
-    }
-
-    /// Returns Unix leap time
-    pub fn unix_leap_time(&self) -> i64 {
-        self.unix_leap_time
-    }
-
-    /// Returns leap second correction
-    pub fn correction(&self) -> i32 {
-        self.correction
-    }
-}
-
-/// ASCII-encoded fixed-capacity string, used for storing time zone designations
-#[derive(Copy, Clone, Eq, PartialEq)]
-struct TzAsciiStr {
-    /// Length-prefixed string buffer
-    bytes: [u8; 8],
-}
-
-impl TzAsciiStr {
-    /// Construct a time zone designation string
-    const fn new(input: &[u8]) -> Result<Self, Error> {
-        let len = input.len();
-
-        if !(3 <= len && len <= 7) {
-            return Err(Error::LocalTimeType(
-                "time zone designation must have between 3 and 7 characters",
-            ));
-        }
-
-        let mut bytes = [0; 8];
-        bytes[0] = input.len() as u8;
-
-        let mut i = 0;
-        while i < len {
-            let b = input[i];
-
-            if !matches!(b, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-') {
-                return Err(Error::LocalTimeType("invalid characters in time zone designation"));
-            }
-
-            bytes[i + 1] = b;
-
-            i += 1;
-        }
-
-        Ok(Self { bytes })
-    }
-
-    /// Returns time zone designation as a byte slice
-    const fn as_bytes(&self) -> &[u8] {
-        match &self.bytes {
-            [3, head @ .., _, _, _, _] => head,
-            [4, head @ .., _, _, _] => head,
-            [5, head @ .., _, _] => head,
-            [6, head @ .., _] => head,
-            [7, head @ ..] => head,
-            _ => unreachable!(),
-        }
-    }
-
-    /// Returns time zone designation as a string
-    const fn as_str(&self) -> &str {
-        // SAFETY: ASCII is valid UTF-8
-        unsafe { str::from_utf8_unchecked(self.as_bytes()) }
-    }
-
-    /// Check if two time zone designations are equal
-    const fn equal(&self, other: &Self) -> bool {
-        u64::from_ne_bytes(self.bytes) == u64::from_ne_bytes(other.bytes)
-    }
-}
-
-impl fmt::Debug for TzAsciiStr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.as_str().fmt(f)
-    }
-}
-
-/// Local time type associated to a time zone
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LocalTimeType {
-    /// Offset from UTC in seconds
-    ut_offset: i32,
-    /// Daylight Saving Time indicator
-    is_dst: bool,
-    /// Time zone designation
-    time_zone_designation: Option<TzAsciiStr>,
-}
-
-impl LocalTimeType {
-    /// Construct a local time type
-    pub fn new(
-        ut_offset: i32,
-        is_dst: bool,
-        time_zone_designation: Option<&[u8]>,
-    ) -> Result<Self, Error> {
-        if ut_offset == i32::MIN {
-            return Err(Error::LocalTimeType("invalid UTC offset"));
-        }
-
-        let time_zone_designation = match time_zone_designation {
-            None => None,
-            Some(time_zone_designation) => match TzAsciiStr::new(time_zone_designation) {
-                Err(error) => return Err(error),
-                Ok(time_zone_designation) => Some(time_zone_designation),
-            },
-        };
-
-        Ok(Self { ut_offset, is_dst, time_zone_designation })
-    }
-
-    /// Construct the local time type associated to UTC
-    pub const fn utc() -> Self {
-        Self { ut_offset: 0, is_dst: false, time_zone_designation: None }
-    }
-
-    /// Construct a local time type with the specified UTC offset in seconds
-    pub fn with_ut_offset(ut_offset: i32) -> Result<Self, Error> {
-        if ut_offset == i32::MIN {
-            return Err(Error::LocalTimeType("invalid UTC offset"));
-        }
-
-        Ok(Self { ut_offset, is_dst: false, time_zone_designation: None })
-    }
-
-    /// Returns offset from UTC in seconds
-    pub fn ut_offset(&self) -> i32 {
-        self.ut_offset
-    }
-
-    /// Returns daylight saving time indicator
-    pub fn is_dst(&self) -> bool {
-        self.is_dst
-    }
-
-    /// Returns time zone designation
-    pub fn time_zone_designation(&self) -> &str {
-        match &self.time_zone_designation {
-            Some(s) => s.as_str(),
-            None => "",
-        }
-    }
-}
-
 /// Time zone
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct TimeZone {
@@ -576,6 +391,191 @@ impl<'a> TimeZoneRef<'a> {
         match unix_leap_time.checked_sub(correction as i64) {
             Some(unix_time) => Ok(unix_time),
             None => Err(Error::OutOfRange("out of range operation")),
+        }
+    }
+}
+
+/// Transition of a TZif file
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct Transition {
+    /// Unix leap time
+    unix_leap_time: i64,
+    /// Index specifying the local time type of the transition
+    local_time_type_index: usize,
+}
+
+impl Transition {
+    /// Construct a TZif file transition
+    pub fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
+        Self { unix_leap_time, local_time_type_index }
+    }
+
+    /// Returns Unix leap time
+    pub fn unix_leap_time(&self) -> i64 {
+        self.unix_leap_time
+    }
+
+    /// Returns local time type index
+    pub fn local_time_type_index(&self) -> usize {
+        self.local_time_type_index
+    }
+}
+
+/// Leap second of a TZif file
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct LeapSecond {
+    /// Unix leap time
+    unix_leap_time: i64,
+    /// Leap second correction
+    correction: i32,
+}
+
+impl LeapSecond {
+    /// Construct a TZif file leap second
+    pub fn new(unix_leap_time: i64, correction: i32) -> Self {
+        Self { unix_leap_time, correction }
+    }
+
+    /// Returns Unix leap time
+    pub fn unix_leap_time(&self) -> i64 {
+        self.unix_leap_time
+    }
+
+    /// Returns leap second correction
+    pub fn correction(&self) -> i32 {
+        self.correction
+    }
+}
+
+/// ASCII-encoded fixed-capacity string, used for storing time zone designations
+#[derive(Copy, Clone, Eq, PartialEq)]
+struct TzAsciiStr {
+    /// Length-prefixed string buffer
+    bytes: [u8; 8],
+}
+
+impl TzAsciiStr {
+    /// Construct a time zone designation string
+    const fn new(input: &[u8]) -> Result<Self, Error> {
+        let len = input.len();
+
+        if !(3 <= len && len <= 7) {
+            return Err(Error::LocalTimeType(
+                "time zone designation must have between 3 and 7 characters",
+            ));
+        }
+
+        let mut bytes = [0; 8];
+        bytes[0] = input.len() as u8;
+
+        let mut i = 0;
+        while i < len {
+            let b = input[i];
+
+            if !matches!(b, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-') {
+                return Err(Error::LocalTimeType("invalid characters in time zone designation"));
+            }
+
+            bytes[i + 1] = b;
+
+            i += 1;
+        }
+
+        Ok(Self { bytes })
+    }
+
+    /// Returns time zone designation as a byte slice
+    const fn as_bytes(&self) -> &[u8] {
+        match &self.bytes {
+            [3, head @ .., _, _, _, _] => head,
+            [4, head @ .., _, _, _] => head,
+            [5, head @ .., _, _] => head,
+            [6, head @ .., _] => head,
+            [7, head @ ..] => head,
+            _ => unreachable!(),
+        }
+    }
+
+    /// Returns time zone designation as a string
+    const fn as_str(&self) -> &str {
+        // SAFETY: ASCII is valid UTF-8
+        unsafe { str::from_utf8_unchecked(self.as_bytes()) }
+    }
+
+    /// Check if two time zone designations are equal
+    const fn equal(&self, other: &Self) -> bool {
+        u64::from_ne_bytes(self.bytes) == u64::from_ne_bytes(other.bytes)
+    }
+}
+
+impl fmt::Debug for TzAsciiStr {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        self.as_str().fmt(f)
+    }
+}
+
+/// Local time type associated to a time zone
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub struct LocalTimeType {
+    /// Offset from UTC in seconds
+    ut_offset: i32,
+    /// Daylight Saving Time indicator
+    is_dst: bool,
+    /// Time zone designation
+    time_zone_designation: Option<TzAsciiStr>,
+}
+
+impl LocalTimeType {
+    /// Construct a local time type
+    pub fn new(
+        ut_offset: i32,
+        is_dst: bool,
+        time_zone_designation: Option<&[u8]>,
+    ) -> Result<Self, Error> {
+        if ut_offset == i32::MIN {
+            return Err(Error::LocalTimeType("invalid UTC offset"));
+        }
+
+        let time_zone_designation = match time_zone_designation {
+            None => None,
+            Some(time_zone_designation) => match TzAsciiStr::new(time_zone_designation) {
+                Err(error) => return Err(error),
+                Ok(time_zone_designation) => Some(time_zone_designation),
+            },
+        };
+
+        Ok(Self { ut_offset, is_dst, time_zone_designation })
+    }
+
+    /// Construct the local time type associated to UTC
+    pub const fn utc() -> Self {
+        Self { ut_offset: 0, is_dst: false, time_zone_designation: None }
+    }
+
+    /// Construct a local time type with the specified UTC offset in seconds
+    pub fn with_ut_offset(ut_offset: i32) -> Result<Self, Error> {
+        if ut_offset == i32::MIN {
+            return Err(Error::LocalTimeType("invalid UTC offset"));
+        }
+
+        Ok(Self { ut_offset, is_dst: false, time_zone_designation: None })
+    }
+
+    /// Returns offset from UTC in seconds
+    pub fn ut_offset(&self) -> i32 {
+        self.ut_offset
+    }
+
+    /// Returns daylight saving time indicator
+    pub fn is_dst(&self) -> bool {
+        self.is_dst
+    }
+
+    /// Returns time zone designation
+    pub fn time_zone_designation(&self) -> &str {
+        match &self.time_zone_designation {
+            Some(s) => s.as_str(),
+            None => "",
         }
     }
 }
