@@ -102,45 +102,6 @@ impl From<TzStringError> for TzFileError {
     }
 }
 
-macro_rules! create_error {
-    (#[$doc:meta], $name:ident) => {
-        #[$doc]
-        #[derive(Debug)]
-        pub struct $name(
-            /// Error description
-            pub &'static str,
-        );
-
-        impl fmt::Display for $name {
-            fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-                self.0.fmt(f)
-            }
-        }
-
-        impl error::Error for $name {}
-    };
-}
-
-create_error!(#[doc = "Out of range error"], OutOfRangeError);
-create_error!(#[doc = "Local time type error"], LocalTimeTypeError);
-create_error!(#[doc = "Transition rule error"], TransitionRuleError);
-create_error!(#[doc = "Time zone error"], TimeZoneError);
-create_error!(#[doc = "Date time error"], DateTimeError);
-create_error!(#[doc = "Local time type search error"], FindLocalTimeTypeError);
-create_error!(#[doc = "Date time projection error"], ProjectDateTimeError);
-
-impl From<OutOfRangeError> for ProjectDateTimeError {
-    fn from(error: OutOfRangeError) -> Self {
-        Self(error.0)
-    }
-}
-
-impl From<FindLocalTimeTypeError> for ProjectDateTimeError {
-    fn from(error: FindLocalTimeTypeError) -> Self {
-        Self(error.0)
-    }
-}
-
 /// Unified error type for everything in the crate
 #[non_exhaustive]
 #[derive(Debug)]
@@ -158,19 +119,19 @@ pub enum Error {
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
     /// Out of range error
-    OutOfRangeError(OutOfRangeError),
+    OutOfRangeError(&'static str),
     /// Local time type error
-    LocalTimeTypeError(LocalTimeTypeError),
+    LocalTimeTypeError(&'static str),
     /// Transition rule error
-    TransitionRuleError(TransitionRuleError),
+    TransitionRuleError(&'static str),
     /// Time zone error
-    TimeZoneError(TimeZoneError),
+    TimeZoneError(&'static str),
     /// Date time error
-    DateTimeError(DateTimeError),
+    DateTimeError(&'static str),
     /// Local time type search error
-    FindLocalTimeTypeError(FindLocalTimeTypeError),
+    FindLocalTimeTypeError(&'static str),
     /// Date time projection error
-    ProjectDateTimeError(ProjectDateTimeError),
+    ProjectDateTimeError(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -231,50 +192,8 @@ impl From<TzStringError> for Error {
     }
 }
 
-impl From<OutOfRangeError> for Error {
-    fn from(error: OutOfRangeError) -> Self {
-        Self::OutOfRangeError(error)
-    }
-}
-
 impl From<TryFromIntError> for Error {
     fn from(_: TryFromIntError) -> Self {
-        Self::OutOfRangeError(OutOfRangeError("out of range integer conversion"))
-    }
-}
-
-impl From<LocalTimeTypeError> for Error {
-    fn from(error: LocalTimeTypeError) -> Self {
-        Self::LocalTimeTypeError(error)
-    }
-}
-
-impl From<TransitionRuleError> for Error {
-    fn from(error: TransitionRuleError) -> Self {
-        Self::TransitionRuleError(error)
-    }
-}
-
-impl From<TimeZoneError> for Error {
-    fn from(error: TimeZoneError) -> Self {
-        Self::TimeZoneError(error)
-    }
-}
-
-impl From<DateTimeError> for Error {
-    fn from(error: DateTimeError) -> Self {
-        Self::DateTimeError(error)
-    }
-}
-
-impl From<FindLocalTimeTypeError> for Error {
-    fn from(error: FindLocalTimeTypeError) -> Self {
-        Self::FindLocalTimeTypeError(error)
-    }
-}
-
-impl From<ProjectDateTimeError> for Error {
-    fn from(error: ProjectDateTimeError) -> Self {
-        Self::ProjectDateTimeError(error)
+        Self::OutOfRangeError("out of range integer conversion")
     }
 }

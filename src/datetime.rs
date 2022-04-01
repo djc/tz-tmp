@@ -9,9 +9,7 @@ use super::{
     CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, HOURS_PER_DAY,
     SECONDS_PER_DAY, SECONDS_PER_HOUR,
 };
-use crate::error::{
-    DateTimeError, Error, FindLocalTimeTypeError, OutOfRangeError, ProjectDateTimeError,
-};
+use crate::error::Error;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -43,22 +41,28 @@ impl DateTime {
         unix_time: i64,
         nanoseconds: u32,
         time_zone_ref: TimeZoneRef,
-    ) -> Result<Self, ProjectDateTimeError> {
+    ) -> Result<Self, Error> {
         let local_time_type = match time_zone_ref.find_local_time_type(unix_time) {
             Ok(&local_time_type) => local_time_type,
-            Err(FindLocalTimeTypeError(error)) => return Err(ProjectDateTimeError(error)),
+            Err(Error::FindLocalTimeTypeError(error)) => {
+                return Err(Error::ProjectDateTimeError(error))
+            }
+            Err(err) => return Err(err),
         };
 
         let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64)
         {
             Some(unix_time_with_offset) => unix_time_with_offset,
-            None => return Err(ProjectDateTimeError("out of range date time")),
+            None => return Err(Error::ProjectDateTimeError("out of range date time")),
         };
 
         let utc_date_time_with_offset =
             match UtcDateTime::from_timespec(unix_time_with_offset, nanoseconds) {
                 Ok(utc_date_time_with_offset) => utc_date_time_with_offset,
-                Err(OutOfRangeError(error)) => return Err(ProjectDateTimeError(error)),
+                Err(Error::OutOfRangeError(error)) => {
+                    return Err(Error::ProjectDateTimeError(error))
+                }
+                Err(err) => return Err(err),
             };
 
         let UtcDateTime { year, month, month_day, hour, minute, second, nanoseconds } =
@@ -80,12 +84,13 @@ impl DateTime {
     pub fn from_total_nanoseconds(
         total_nanoseconds: i128,
         time_zone_ref: TimeZoneRef,
-    ) -> Result<Self, ProjectDateTimeError> {
+    ) -> Result<Self, Error> {
         match total_nanoseconds_to_timespec(total_nanoseconds) {
             Ok((unix_time, nanoseconds)) => {
                 Self::from_timespec(unix_time, nanoseconds, time_zone_ref)
             }
-            Err(OutOfRangeError(error)) => Err(ProjectDateTimeError(error)),
+            Err(Error::OutOfRangeError(error)) => Err(Error::ProjectDateTimeError(error)),
+            Err(err) => return Err(err),
         }
     }
 
@@ -98,7 +103,7 @@ impl DateTime {
     /// Project the date time into another time zone.
     ///
     /// Leap seconds are not preserved.
-    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, ProjectDateTimeError> {
+    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<Self, Error> {
         Self::from_timespec(self.unix_time, self.nanoseconds, time_zone_ref)
     }
 
@@ -230,7 +235,7 @@ impl UtcDateTime {
         minute: u8,
         second: u8,
         nanoseconds: u32,
-    ) -> Result<Self, DateTimeError> {
+    ) -> Result<Self, Error> {
         // Exclude the maximum possible UTC date time with a leap second
         if year == i32::MAX
             && month == 12
@@ -239,26 +244,26 @@ impl UtcDateTime {
             && minute == 59
             && second == 60
         {
-            return Err(DateTimeError("out of range date time"));
+            return Err(Error::DateTimeError("out of range date time"));
         }
 
         if !(1 <= month && month <= 12) {
-            return Err(DateTimeError("invalid month"));
+            return Err(Error::DateTimeError("invalid month"));
         }
         if !(1 <= month_day && month_day <= 31) {
-            return Err(DateTimeError("invalid month day"));
+            return Err(Error::DateTimeError("invalid month day"));
         }
         if hour > 23 {
-            return Err(DateTimeError("invalid hour"));
+            return Err(Error::DateTimeError("invalid hour"));
         }
         if minute > 59 {
-            return Err(DateTimeError("invalid minute"));
+            return Err(Error::DateTimeError("invalid minute"));
         }
         if second > 60 {
-            return Err(DateTimeError("invalid second"));
+            return Err(Error::DateTimeError("invalid second"));
         }
         if nanoseconds >= NANOSECONDS_PER_SECOND {
-            return Err(DateTimeError("invalid nanoseconds"));
+            return Err(Error::DateTimeError("invalid nanoseconds"));
         }
 
         let leap = is_leap_year(year) as i64;
@@ -269,17 +274,17 @@ impl UtcDateTime {
         }
 
         if month_day as i64 > day_in_month {
-            return Err(DateTimeError("invalid month day"));
+            return Err(Error::DateTimeError("invalid month day"));
         }
 
         Ok(Self { year, month, month_day, hour, minute, second, nanoseconds })
     }
 
     /// Construct a UTC date time from a Unix time in seconds and nanoseconds
-    pub fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, OutOfRangeError> {
+    pub fn from_timespec(unix_time: i64, nanoseconds: u32) -> Result<Self, Error> {
         let seconds = match unix_time.checked_sub(UNIX_OFFSET_SECS) {
             Some(seconds) => seconds,
-            None => return Err(OutOfRangeError("out of range operation")),
+            None => return Err(Error::OutOfRangeError("out of range operation")),
         };
 
         let mut remaining_days = seconds / SECONDS_PER_DAY;
@@ -336,7 +341,7 @@ impl UtcDateTime {
 
         let year = match i32::try_from(year) {
             Ok(year) => year,
-            Err(_) => return Err(OutOfRangeError("i64 is out of range for i32")),
+            Err(_) => return Err(Error::OutOfRangeError("i64 is out of range for i32")),
         };
 
         Ok(Self {
@@ -373,7 +378,7 @@ impl UtcDateTime {
     /// Project the UTC date time into a time zone.
     ///
     /// Leap seconds are not preserved.
-    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, ProjectDateTimeError> {
+    pub fn project(&self, time_zone_ref: TimeZoneRef) -> Result<DateTime, Error> {
         DateTime::from_timespec(self.unix_time(), self.nanoseconds, time_zone_ref)
     }
 
@@ -522,11 +527,11 @@ fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
 ///
 /// * `unix_time`: Unix time in seconds
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
-fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), OutOfRangeError> {
+fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), Error> {
     let unix_time =
         match i64::try_from(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
             Ok(unix_time) => unix_time,
-            Err(_) => return Err(OutOfRangeError("cannot convert i128 to i64")),
+            Err(_) => return Err(Error::OutOfRangeError("cannot convert i128 to i64")),
         };
 
     let nanoseconds = total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32;
@@ -616,7 +621,7 @@ mod test {
         days_since_unix_epoch, is_leap_year, nanoseconds_since_unix_epoch,
         total_nanoseconds_to_timespec, week_day, year_day, DateTime, UtcDateTime,
     };
-    use crate::error::{DateTimeError, Error, OutOfRangeError, ProjectDateTimeError};
+    use crate::error::Error;
     use crate::timezone::{LocalTimeType, TimeZone};
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
@@ -1000,7 +1005,10 @@ mod test {
         let min_unix_time = -67768100567971200;
         let max_unix_time = 67767976233532799;
 
-        assert!(matches!(UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0), Err(DateTimeError(_))));
+        assert!(matches!(
+            UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0),
+            Err(Error::DateTimeError(_))
+        ));
 
         assert!(UtcDateTime::from_timespec(min_unix_time, 0).is_ok());
         assert!(UtcDateTime::from_timespec(max_unix_time, 0).is_ok());
@@ -1010,32 +1018,32 @@ mod test {
 
         assert!(matches!(
             UtcDateTime::from_timespec(min_unix_time - 1, 0),
-            Err(OutOfRangeError(_))
+            Err(Error::OutOfRangeError(_))
         ));
         assert!(matches!(
             UtcDateTime::from_timespec(max_unix_time + 1, 0),
-            Err(OutOfRangeError(_))
+            Err(Error::OutOfRangeError(_))
         ));
 
         assert!(matches!(
             UtcDateTime::from_timespec(min_unix_time, 0)?.project(TimeZone::fixed(-1)?.as_ref()),
-            Err(ProjectDateTimeError(_))
+            Err(Error::ProjectDateTimeError(_))
         ));
         assert!(matches!(
             UtcDateTime::from_timespec(max_unix_time, 0)?.project(TimeZone::fixed(1)?.as_ref()),
-            Err(ProjectDateTimeError(_))
+            Err(Error::ProjectDateTimeError(_))
         ));
 
-        assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(OutOfRangeError(_))));
-        assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(OutOfRangeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(Error::OutOfRangeError(_))));
+        assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(Error::OutOfRangeError(_))));
 
         assert!(matches!(
             DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()),
-            Err(ProjectDateTimeError(_))
+            Err(Error::ProjectDateTimeError(_))
         ));
         assert!(matches!(
             DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()),
-            Err(ProjectDateTimeError(_))
+            Err(Error::ProjectDateTimeError(_))
         ));
 
         Ok(())
@@ -1113,8 +1121,8 @@ mod test {
         assert!(matches!(total_nanoseconds_to_timespec(-999_999_000), Ok((-1, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(-1_999_999_000), Ok((-2, 1000))));
 
-        assert!(matches!(total_nanoseconds_to_timespec(i128::MAX), Err(OutOfRangeError(_))));
-        assert!(matches!(total_nanoseconds_to_timespec(i128::MIN), Err(OutOfRangeError(_))));
+        assert!(matches!(total_nanoseconds_to_timespec(i128::MAX), Err(Error::OutOfRangeError(_))));
+        assert!(matches!(total_nanoseconds_to_timespec(i128::MIN), Err(Error::OutOfRangeError(_))));
 
         let min_total_nanoseconds = -9223372036854775808000000000;
         let max_total_nanoseconds = 9223372036854775807999999999;
@@ -1127,11 +1135,11 @@ mod test {
 
         assert!(matches!(
             total_nanoseconds_to_timespec(min_total_nanoseconds - 1),
-            Err(OutOfRangeError(_))
+            Err(Error::OutOfRangeError(_))
         ));
         assert!(matches!(
             total_nanoseconds_to_timespec(max_total_nanoseconds + 1),
-            Err(OutOfRangeError(_))
+            Err(Error::OutOfRangeError(_))
         ));
 
         Ok(())

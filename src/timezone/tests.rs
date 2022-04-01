@@ -2,9 +2,7 @@ use super::{
     AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LeapSecond, LocalTimeType, MonthWeekDay,
     RuleDay, TimeZone, Transition, TransitionRule, TzAsciiStr,
 };
-use crate::error::{
-    Error, FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TzStringError,
-};
+use crate::error::{Error, TzStringError};
 
 #[test]
 fn test_no_dst() -> Result<(), Error> {
@@ -239,19 +237,19 @@ fn test_v3_file() -> Result<(), Error> {
 
 #[test]
 fn test_tz_ascii_str() -> Result<(), Error> {
-    assert!(matches!(TzAsciiStr::new(b""), Err(LocalTimeTypeError(_))));
-    assert!(matches!(TzAsciiStr::new(b"1"), Err(LocalTimeTypeError(_))));
-    assert!(matches!(TzAsciiStr::new(b"12"), Err(LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b""), Err(Error::LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b"1"), Err(Error::LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b"12"), Err(Error::LocalTimeTypeError(_))));
     assert_eq!(TzAsciiStr::new(b"123")?.as_bytes(), b"123");
     assert_eq!(TzAsciiStr::new(b"1234")?.as_bytes(), b"1234");
     assert_eq!(TzAsciiStr::new(b"12345")?.as_bytes(), b"12345");
     assert_eq!(TzAsciiStr::new(b"123456")?.as_bytes(), b"123456");
     assert_eq!(TzAsciiStr::new(b"1234567")?.as_bytes(), b"1234567");
-    assert!(matches!(TzAsciiStr::new(b"12345678"), Err(LocalTimeTypeError(_))));
-    assert!(matches!(TzAsciiStr::new(b"123456789"), Err(LocalTimeTypeError(_))));
-    assert!(matches!(TzAsciiStr::new(b"1234567890"), Err(LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b"12345678"), Err(Error::LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b"123456789"), Err(Error::LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b"1234567890"), Err(Error::LocalTimeTypeError(_))));
 
-    assert!(matches!(TzAsciiStr::new(b"123\0\0\0"), Err(LocalTimeTypeError(_))));
+    assert!(matches!(TzAsciiStr::new(b"123\0\0\0"), Err(Error::LocalTimeTypeError(_))));
 
     Ok(())
 }
@@ -384,11 +382,11 @@ fn test_transition_rule_overflow() -> Result<(), Error> {
 
     assert!(matches!(
         transition_rule_1.find_local_time_type(min_unix_time),
-        Err(OutOfRangeError(_))
+        Err(Error::OutOfRangeError(_))
     ));
     assert!(matches!(
         transition_rule_2.find_local_time_type(max_unix_time),
-        Err(OutOfRangeError(_))
+        Err(Error::OutOfRangeError(_))
     ));
 
     Ok(())
@@ -418,7 +416,7 @@ fn test_time_zone() -> Result<(), Error> {
     assert_eq!(*time_zone_2.find_local_time_type(0)?, cet);
 
     assert_eq!(*time_zone_3.find_local_time_type(-1)?, utc);
-    assert!(matches!(time_zone_3.find_local_time_type(0), Err(FindLocalTimeTypeError(_))));
+    assert!(matches!(time_zone_3.find_local_time_type(0), Err(Error::FindLocalTimeTypeError(_))));
 
     assert_eq!(*time_zone_4.find_local_time_type(-1)?, utc);
     assert_eq!(*time_zone_4.find_local_time_type(0)?, cet);
@@ -529,7 +527,10 @@ fn test_leap_seconds_overflow() -> Result<(), Error> {
         vec![LeapSecond::new(0, 1)],
         None,
     )?;
-    assert!(matches!(time_zone.find_local_time_type(i64::MAX), Err(FindLocalTimeTypeError(_))));
+    assert!(matches!(
+        time_zone.find_local_time_type(i64::MAX),
+        Err(Error::FindLocalTimeTypeError(_))
+    ));
 
     Ok(())
 }

@@ -13,10 +13,7 @@ use super::{
     SECONDS_PER_DAY,
 };
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
-use crate::error::{
-    Error, FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
-    TransitionRuleError, TzFileError, TzStringError,
-};
+use crate::error::{Error, TzFileError, TzStringError};
 
 #[cfg(test)]
 mod tests;
@@ -82,11 +79,11 @@ struct TzAsciiStr {
 
 impl TzAsciiStr {
     /// Construct a time zone designation string
-    const fn new(input: &[u8]) -> Result<Self, LocalTimeTypeError> {
+    const fn new(input: &[u8]) -> Result<Self, Error> {
         let len = input.len();
 
         if !(3 <= len && len <= 7) {
-            return Err(LocalTimeTypeError(
+            return Err(Error::LocalTimeTypeError(
                 "time zone designation must have between 3 and 7 characters",
             ));
         }
@@ -99,7 +96,9 @@ impl TzAsciiStr {
             let b = input[i];
 
             if !matches!(b, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-') {
-                return Err(LocalTimeTypeError("invalid characters in time zone designation"));
+                return Err(Error::LocalTimeTypeError(
+                    "invalid characters in time zone designation",
+                ));
             }
 
             bytes[i + 1] = b;
@@ -157,9 +156,9 @@ impl LocalTimeType {
         ut_offset: i32,
         is_dst: bool,
         time_zone_designation: Option<&[u8]>,
-    ) -> Result<Self, LocalTimeTypeError> {
+    ) -> Result<Self, Error> {
         if ut_offset == i32::MIN {
-            return Err(LocalTimeTypeError("invalid UTC offset"));
+            return Err(Error::LocalTimeTypeError("invalid UTC offset"));
         }
 
         let time_zone_designation = match time_zone_designation {
@@ -179,9 +178,9 @@ impl LocalTimeType {
     }
 
     /// Construct a local time type with the specified UTC offset in seconds
-    pub fn with_ut_offset(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
+    pub fn with_ut_offset(ut_offset: i32) -> Result<Self, Error> {
         if ut_offset == i32::MIN {
-            return Err(LocalTimeTypeError("invalid UTC offset"));
+            return Err(Error::LocalTimeTypeError("invalid UTC offset"));
         }
 
         Ok(Self { ut_offset, is_dst: false, time_zone_designation: None })
@@ -212,9 +211,9 @@ pub struct Julian1WithoutLeap(u16);
 
 impl Julian1WithoutLeap {
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
-    pub fn new(julian_day_1: u16) -> Result<Self, TransitionRuleError> {
+    pub fn new(julian_day_1: u16) -> Result<Self, Error> {
         if !(1 <= julian_day_1 && julian_day_1 <= 365) {
-            return Err(TransitionRuleError("invalid rule day julian day"));
+            return Err(Error::TransitionRuleError("invalid rule day julian day"));
         }
 
         Ok(Self(julian_day_1))
@@ -232,9 +231,9 @@ pub struct Julian0WithLeap(u16);
 
 impl Julian0WithLeap {
     /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
-    pub fn new(julian_day_0: u16) -> Result<Self, TransitionRuleError> {
+    pub fn new(julian_day_0: u16) -> Result<Self, Error> {
         if julian_day_0 > 365 {
-            return Err(TransitionRuleError("invalid rule day julian day"));
+            return Err(Error::TransitionRuleError("invalid rule day julian day"));
         }
 
         Ok(Self(julian_day_0))
@@ -259,17 +258,17 @@ pub struct MonthWeekDay {
 
 impl MonthWeekDay {
     /// Construct a transition rule day represented by a month, a month week and a week day
-    pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, TransitionRuleError> {
+    pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
         if !(1 <= month && month <= 12) {
-            return Err(TransitionRuleError("invalid rule day month"));
+            return Err(Error::TransitionRuleError("invalid rule day month"));
         }
 
         if !(1 <= week && week <= 5) {
-            return Err(TransitionRuleError("invalid rule day week"));
+            return Err(Error::TransitionRuleError("invalid rule day week"));
         }
 
         if week_day > 6 {
-            return Err(TransitionRuleError("invalid rule day week day"));
+            return Err(Error::TransitionRuleError("invalid rule day week day"));
         }
 
         Ok(Self { month, week, week_day })
@@ -429,19 +428,19 @@ impl AlternateTime {
         dst_start_time: i32,
         dst_end: RuleDay,
         dst_end_time: i32,
-    ) -> Result<Self, TransitionRuleError> {
+    ) -> Result<Self, Error> {
         // Overflow is not possible
         if !((dst_start_time as i64).abs() < SECONDS_PER_WEEK
             && (dst_end_time as i64).abs() < SECONDS_PER_WEEK)
         {
-            return Err(TransitionRuleError("invalid DST start or end time"));
+            return Err(Error::TransitionRuleError("invalid DST start or end time"));
         }
 
         Ok(Self { std, dst, dst_start, dst_start_time, dst_end, dst_end_time })
     }
 
     /// Find the local time type associated to the alternate transition rule at the specified Unix time in seconds
-    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, Error> {
         // Overflow is not possible
         let dst_start_time_in_utc = self.dst_start_time as i64 - self.std.ut_offset as i64;
         let dst_end_time_in_utc = self.dst_end_time as i64 - self.dst.ut_offset as i64;
@@ -453,7 +452,7 @@ impl AlternateTime {
 
         // Check if the current year is valid for the following computations
         if !(i32::MIN + 2 <= current_year && current_year <= i32::MAX - 2) {
-            return Err(OutOfRangeError("out of range date time"));
+            return Err(Error::OutOfRangeError("out of range date time"));
         }
 
         let current_year_dst_start_unix_time =
@@ -720,7 +719,7 @@ impl TransitionRule {
     }
 
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
-    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, OutOfRangeError> {
+    fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, Error> {
         match self {
             Self::Fixed(local_time_type) => Ok(local_time_type),
             Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
@@ -807,7 +806,7 @@ impl TimeZone {
         local_time_types: Vec<LocalTimeType>,
         leap_seconds: Vec<LeapSecond>,
         extra_rule: Option<TransitionRule>,
-    ) -> Result<Self, TimeZoneError> {
+    ) -> Result<Self, Error> {
         TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule)
             .check_inputs()?;
         Ok(Self { transitions, local_time_types, leap_seconds, extra_rule })
@@ -844,7 +843,7 @@ impl TimeZone {
     }
 
     /// Construct a time zone with the specified UTC offset in seconds
-    pub fn fixed(ut_offset: i32) -> Result<Self, LocalTimeTypeError> {
+    pub fn fixed(ut_offset: i32) -> Result<Self, Error> {
         Ok(Self {
             transitions: Vec::new(),
             local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?],
@@ -871,10 +870,7 @@ impl TimeZone {
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    pub fn find_local_time_type(
-        &self,
-        unix_time: i64,
-    ) -> Result<&LocalTimeType, FindLocalTimeTypeError> {
+    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, Error> {
         self.as_ref().find_local_time_type(unix_time)
     }
 
@@ -909,7 +905,7 @@ impl<'a> TimeZoneRef<'a> {
         local_time_types: &'a [LocalTimeType],
         leap_seconds: &'a [LeapSecond],
         extra_rule: &'a Option<TransitionRule>,
-    ) -> Result<Self, TimeZoneError> {
+    ) -> Result<Self, Error> {
         let time_zone_ref =
             Self::new_unchecked(transitions, local_time_types, leap_seconds, extra_rule);
 
@@ -951,10 +947,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
-    pub fn find_local_time_type(
-        &self,
-        unix_time: i64,
-    ) -> Result<&'a LocalTimeType, FindLocalTimeTypeError> {
+    pub fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, Error> {
         let extra_rule = match self.transitions.last() {
             None => match self.extra_rule {
                 Some(extra_rule) => extra_rule,
@@ -963,14 +956,17 @@ impl<'a> TimeZoneRef<'a> {
             Some(last_transition) => {
                 let unix_leap_time = match self.unix_time_to_unix_leap_time(unix_time) {
                     Ok(unix_leap_time) => unix_leap_time,
-                    Err(OutOfRangeError(error)) => return Err(FindLocalTimeTypeError(error)),
+                    Err(Error::OutOfRangeError(error)) => {
+                        return Err(Error::FindLocalTimeTypeError(error))
+                    }
+                    Err(err) => return Err(err),
                 };
 
                 if unix_leap_time >= last_transition.unix_leap_time {
                     match self.extra_rule {
                         Some(extra_rule) => extra_rule,
                         None => {
-                            return Err(FindLocalTimeTypeError(
+                            return Err(Error::FindLocalTimeTypeError(
                                 "no local time type is available for the specified timestamp",
                             ))
                         }
@@ -996,7 +992,8 @@ impl<'a> TimeZoneRef<'a> {
 
         match extra_rule.find_local_time_type(unix_time) {
             Ok(local_time_type) => Ok(local_time_type),
-            Err(OutOfRangeError(error)) => Err(FindLocalTimeTypeError(error)),
+            Err(Error::OutOfRangeError(error)) => Err(Error::FindLocalTimeTypeError(error)),
+            err => err,
         }
     }
 
@@ -1011,25 +1008,25 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Check time zone inputs
-    fn check_inputs(&self) -> Result<(), TimeZoneError> {
+    fn check_inputs(&self) -> Result<(), Error> {
         // Check local time types
         let local_time_types_size = self.local_time_types.len();
         if local_time_types_size == 0 {
-            return Err(TimeZoneError("list of local time types must not be empty"));
+            return Err(Error::TimeZoneError("list of local time types must not be empty"));
         }
 
         // Check transitions
         let mut i_transition = 0;
         while i_transition < self.transitions.len() {
             if self.transitions[i_transition].local_time_type_index >= local_time_types_size {
-                return Err(TimeZoneError("invalid local time type index"));
+                return Err(Error::TimeZoneError("invalid local time type index"));
             }
 
             if i_transition + 1 < self.transitions.len()
                 && self.transitions[i_transition].unix_leap_time
                     >= self.transitions[i_transition + 1].unix_leap_time
             {
-                return Err(TimeZoneError("invalid transition"));
+                return Err(Error::TimeZoneError("invalid transition"));
             }
 
             i_transition += 1;
@@ -1040,7 +1037,7 @@ impl<'a> TimeZoneRef<'a> {
             || self.leap_seconds[0].unix_leap_time >= 0
                 && self.leap_seconds[0].correction.saturating_abs() == 1)
         {
-            return Err(TimeZoneError("invalid leap second"));
+            return Err(Error::TimeZoneError("invalid leap second"));
         }
 
         let min_interval = SECONDS_PER_28_DAYS - 1;
@@ -1056,7 +1053,7 @@ impl<'a> TimeZoneRef<'a> {
                     x1.correction.saturating_sub(x0.correction).saturating_abs();
 
                 if !(diff_unix_leap_time >= min_interval && abs_diff_correction == 1) {
-                    return Err(TimeZoneError("invalid leap second"));
+                    return Err(Error::TimeZoneError("invalid leap second"));
                 }
             }
             i_leap_second += 1;
@@ -1071,12 +1068,14 @@ impl<'a> TimeZoneRef<'a> {
 
             let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
                 Ok(unix_time) => unix_time,
-                Err(OutOfRangeError(error)) => return Err(TimeZoneError(error)),
+                Err(Error::OutOfRangeError(error)) => return Err(Error::TimeZoneError(error)),
+                Err(err) => return Err(err.into()),
             };
 
             let rule_local_time_type = match extra_rule.find_local_time_type(unix_time) {
                 Ok(rule_local_time_type) => rule_local_time_type,
-                Err(OutOfRangeError(error)) => return Err(TimeZoneError(error)),
+                Err(Error::OutOfRangeError(error)) => return Err(Error::TimeZoneError(error)),
+                Err(err) => return Err(err),
             };
 
             let check = last_local_time_type.ut_offset == rule_local_time_type.ut_offset
@@ -1091,7 +1090,7 @@ impl<'a> TimeZoneRef<'a> {
                 };
 
             if !check {
-                return Err(TimeZoneError(
+                return Err(Error::TimeZoneError(
                     "extra transition rule is inconsistent with the last transition",
                 ));
             }
@@ -1101,7 +1100,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Convert Unix time to Unix leap time, from the list of leap seconds in a time zone
-    const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, OutOfRangeError> {
+    const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, Error> {
         let mut unix_leap_time = unix_time;
 
         let mut i = 0;
@@ -1114,7 +1113,7 @@ impl<'a> TimeZoneRef<'a> {
 
             unix_leap_time = match unix_time.checked_add(leap_second.correction as i64) {
                 Some(unix_leap_time) => unix_leap_time,
-                None => return Err(OutOfRangeError("out of range operation")),
+                None => return Err(Error::OutOfRangeError("out of range operation")),
             };
 
             i += 1;
@@ -1124,9 +1123,9 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Convert Unix leap time to Unix time, from the list of leap seconds in a time zone
-    fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, OutOfRangeError> {
+    fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, Error> {
         if unix_leap_time == i64::MIN {
-            return Err(OutOfRangeError("out of range operation"));
+            return Err(Error::OutOfRangeError("out of range operation"));
         }
 
         let index = match self
@@ -1141,7 +1140,7 @@ impl<'a> TimeZoneRef<'a> {
 
         match unix_leap_time.checked_sub(correction as i64) {
             Some(unix_time) => Ok(unix_time),
-            None => Err(OutOfRangeError("out of range operation")),
+            None => Err(Error::OutOfRangeError("out of range operation")),
         }
     }
 }
