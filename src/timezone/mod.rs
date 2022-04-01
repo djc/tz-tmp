@@ -1137,7 +1137,7 @@ impl<'a> TimeZoneRef<'a> {
 }
 
 /// Open the TZif file corresponding to a TZ string
-pub(crate) fn find_tz_file(path: impl AsRef<Path>) -> Result<File, Error> {
+fn find_tz_file(path: impl AsRef<Path>) -> Result<File, Error> {
     // Don't check system timezone directories on non-UNIX platforms
     #[cfg(not(unix))]
     return Ok(File::open(path)?);
