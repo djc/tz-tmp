@@ -616,7 +616,7 @@ mod test {
         days_since_unix_epoch, is_leap_year, nanoseconds_since_unix_epoch,
         total_nanoseconds_to_timespec, week_day, year_day, DateTime, UtcDateTime,
     };
-    use crate::error::{DateTimeError, OutOfRangeError, ProjectDateTimeError};
+    use crate::error::{DateTimeError, Error, OutOfRangeError, ProjectDateTimeError};
     use crate::timezone::{LocalTimeType, TimeZone};
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
@@ -632,7 +632,7 @@ mod test {
     }
 
     #[test]
-    fn test_date_time() -> Result<(), crate::Error> {
+    fn test_date_time() -> Result<(), Error> {
         let time_zone_utc = TimeZone::utc();
         let utc = LocalTimeType::utc();
 
@@ -771,7 +771,7 @@ mod test {
     }
 
     #[test]
-    fn test_date_time_leap_seconds() -> Result<(), crate::Error> {
+    fn test_date_time_leap_seconds() -> Result<(), Error> {
         let utc_date_time = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
 
         assert_eq!(
@@ -799,7 +799,7 @@ mod test {
     }
 
     #[test]
-    fn test_date_time_partial_eq_partial_ord() -> Result<(), crate::Error> {
+    fn test_date_time_partial_eq_partial_ord() -> Result<(), Error> {
         let time_zone_utc = TimeZone::utc();
         let time_zone_cet = TimeZone::fixed(3600)?;
         let time_zone_eet = TimeZone::fixed(7200)?;
@@ -866,7 +866,7 @@ mod test {
     }
 
     #[test]
-    fn test_utc_date_time_ord() -> Result<(), crate::Error> {
+    fn test_utc_date_time_ord() -> Result<(), Error> {
         let utc_date_time_1 = UtcDateTime::new(1972, 6, 30, 23, 59, 59, 1000)?;
         let utc_date_time_2 = UtcDateTime::new(1972, 6, 30, 23, 59, 60, 1000)?;
         let utc_date_time_3 = UtcDateTime::new(1972, 7, 1, 0, 0, 0, 1000)?;
@@ -940,7 +940,7 @@ mod test {
     }
 
     #[test]
-    fn test_date_time_format() -> Result<(), crate::Error> {
+    fn test_date_time_format() -> Result<(), Error> {
         let time_zones = [
             TimeZone::fixed(-49550)?,
             TimeZone::fixed(-5400)?,
@@ -996,7 +996,7 @@ mod test {
     }
 
     #[test]
-    fn test_date_time_overflow() -> Result<(), crate::Error> {
+    fn test_date_time_overflow() -> Result<(), Error> {
         let min_unix_time = -67768100567971200;
         let max_unix_time = 67767976233532799;
 
@@ -1107,7 +1107,7 @@ mod test {
     }
 
     #[test]
-    fn test_total_nanoseconds_to_timespec() -> Result<(), crate::Error> {
+    fn test_total_nanoseconds_to_timespec() -> Result<(), Error> {
         assert!(matches!(total_nanoseconds_to_timespec(1_000_001_000), Ok((1, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(1000), Ok((0, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(-999_999_000), Ok((-1, 1000))));
