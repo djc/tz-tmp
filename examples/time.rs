@@ -1,5 +1,5 @@
-use std::time::SystemTime;
 use std::convert::TryInto;
+use std::time::SystemTime;
 
 use tz::{DateTime, Error, TimeZone, UtcDateTime};
 
