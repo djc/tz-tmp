@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::fs::{self, File};
 use std::io::{self, Read};
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use std::{fmt, iter, str};
 
@@ -779,10 +780,10 @@ impl TimeZone {
 
         let mut chars = tz_string.chars();
         if chars.next() == Some(':') {
-            return Self::from_file(&mut get_tz_file(chars.as_str())?);
+            return Self::from_file(&mut find_tz_file(chars.as_str())?);
         }
 
-        if let Ok(mut file) = get_tz_file(tz_string) {
+        if let Ok(mut file) = find_tz_file(tz_string) {
             return Self::from_file(&mut file);
         }
 
@@ -1146,29 +1147,32 @@ impl<'a> TimeZoneRef<'a> {
 }
 
 /// Open the TZif file corresponding to a TZ string
-pub(crate) fn get_tz_file(tz_string: &str) -> Result<File, TzFileError> {
+pub(crate) fn find_tz_file(path: impl AsRef<Path>) -> Result<File, TzFileError> {
     // Don't check system timezone directories on non-UNIX platforms
     #[cfg(not(unix))]
-    return Ok(File::open(tz_string)?);
+    return Ok(File::open(path)?);
 
     #[cfg(unix)]
     {
-        // Possible system timezone directories
-        const ZONE_INFO_DIRECTORIES: [&str; 3] =
-            ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
-
-        if tz_string.starts_with('/') {
-            Ok(File::open(tz_string)?)
-        } else {
-            for folder in &ZONE_INFO_DIRECTORIES {
-                if let Ok(file) = File::open(format!("{}/{}", folder, tz_string)) {
-                    return Ok(file);
-                }
-            }
-            Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
+        let path = path.as_ref();
+        if path.is_absolute() {
+            return Ok(File::open(path)?);
         }
+
+        for folder in &ZONE_INFO_DIRECTORIES {
+            if let Ok(file) = File::open(PathBuf::from(folder).join(path)) {
+                return Ok(file);
+            }
+        }
+
+        Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
     }
 }
+
+// Possible system timezone directories
+#[cfg(unix)]
+const ZONE_INFO_DIRECTORIES: [&str; 3] =
+    ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
 
 /// TZif version
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
