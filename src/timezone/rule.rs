@@ -9,7 +9,7 @@ use crate::{
 
 /// Transition rule
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum TransitionRule {
+pub(super) enum TransitionRule {
     /// Fixed local time type
     Fixed(LocalTimeType),
     /// Alternate local time types
@@ -92,7 +92,7 @@ impl From<AlternateTime> for TransitionRule {
 
 /// Transition rule representing alternate local time types
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct AlternateTime {
+pub(super) struct AlternateTime {
     /// Local time type for standard time
     pub(super) std: LocalTimeType,
     /// Local time type for Daylight Saving Time
@@ -109,7 +109,7 @@ pub struct AlternateTime {
 
 impl AlternateTime {
     /// Construct a transition rule representing alternate local time types
-    pub fn new(
+    fn new(
         std: LocalTimeType,
         dst: LocalTimeType,
         dst_start: RuleDay,
@@ -309,7 +309,7 @@ fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), Erro
 
 /// Transition rule day
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum RuleDay {
+enum RuleDay {
     /// Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
     Julian1WithoutLeap(Julian1WithoutLeap),
     /// Zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
@@ -449,47 +449,37 @@ impl From<MonthWeekDay> for RuleDay {
 }
 /// Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Julian1WithoutLeap(u16);
+struct Julian1WithoutLeap(u16);
 
 impl Julian1WithoutLeap {
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
-    pub fn new(julian_day_1: u16) -> Result<Self, Error> {
+    fn new(julian_day_1: u16) -> Result<Self, Error> {
         if !(1..=365).contains(&julian_day_1) {
             return Err(Error::TransitionRule("invalid rule day julian day"));
         }
 
         Ok(Self(julian_day_1))
     }
-
-    /// Returns inner value
-    pub fn get(&self) -> u16 {
-        self.0
-    }
 }
 
 /// Zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Julian0WithLeap(u16);
+struct Julian0WithLeap(u16);
 
 impl Julian0WithLeap {
     /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
-    pub fn new(julian_day_0: u16) -> Result<Self, Error> {
+    fn new(julian_day_0: u16) -> Result<Self, Error> {
         if julian_day_0 > 365 {
             return Err(Error::TransitionRule("invalid rule day julian day"));
         }
 
         Ok(Self(julian_day_0))
     }
-
-    /// Returns inner value
-    pub fn get(&self) -> u16 {
-        self.0
-    }
 }
 
 /// Day represented by a month, a month week and a week day
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct MonthWeekDay {
+struct MonthWeekDay {
     /// Month in `[1, 12]`
     month: u8,
     /// Week of the month in `[1, 5]`, with `5` representing the last week of the month
@@ -500,7 +490,7 @@ pub struct MonthWeekDay {
 
 impl MonthWeekDay {
     /// Construct a transition rule day represented by a month, a month week and a week day
-    pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
+    fn new(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
         if !(1..=12).contains(&month) {
             return Err(Error::TransitionRule("invalid rule day month"));
         }
@@ -514,21 +504,6 @@ impl MonthWeekDay {
         }
 
         Ok(Self { month, week, week_day })
-    }
-
-    /// Returns month in `[1, 12]`
-    pub fn month(&self) -> u8 {
-        self.month
-    }
-
-    /// Returns week of the month in `[1, 5]`, with `5` representing the last week of the month
-    pub fn week(&self) -> u8 {
-        self.week
-    }
-
-    /// Returns day of the week in `[0, 6]` from Sunday
-    pub fn week_day(&self) -> u8 {
-        self.week_day
     }
 }
 

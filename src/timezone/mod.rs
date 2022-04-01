@@ -76,7 +76,7 @@ impl TimeZone {
     }
 
     /// Construct a time zone
-    pub fn new(
+    fn new(
         transitions: Vec<Transition>,
         local_time_types: Vec<LocalTimeType>,
         leap_seconds: Vec<LeapSecond>,
@@ -151,23 +151,6 @@ pub struct TimeZoneRef<'a> {
 }
 
 impl<'a> TimeZoneRef<'a> {
-    /// Construct a time zone reference
-    pub fn new(
-        transitions: &'a [Transition],
-        local_time_types: &'a [LocalTimeType],
-        leap_seconds: &'a [LeapSecond],
-        extra_rule: &'a Option<TransitionRule>,
-    ) -> Result<Self, Error> {
-        let time_zone_ref =
-            Self::new_unchecked(transitions, local_time_types, leap_seconds, extra_rule);
-
-        if let Err(error) = time_zone_ref.check_inputs() {
-            return Err(error);
-        }
-
-        Ok(time_zone_ref)
-    }
-
     /// Construct the time zone reference associated to UTC
     pub const fn utc() -> Self {
         Self {
@@ -191,11 +174,6 @@ impl<'a> TimeZoneRef<'a> {
     /// Returns list of leap seconds
     pub fn leap_seconds(&self) -> &'a [LeapSecond] {
         self.leap_seconds
-    }
-
-    /// Returns extra transition rule applicable after the last transition
-    pub fn extra_rule(&self) -> &'a Option<TransitionRule> {
-        self.extra_rule
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
