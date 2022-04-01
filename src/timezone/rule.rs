@@ -49,10 +49,10 @@ impl TransitionRule {
         }
 
         cursor.read_tag(b",")?;
-        let (dst_start, dst_start_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
+        let (dst_start, dst_start_time) = RuleDay::parse(&mut cursor, use_string_extensions)?;
 
         cursor.read_tag(b",")?;
-        let (dst_end, dst_end_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
+        let (dst_end, dst_end_time) = RuleDay::parse(&mut cursor, use_string_extensions)?;
 
         if !cursor.is_empty() {
             return Err(Error::InvalidTzString("remaining data after parsing TZ string"));
@@ -275,38 +275,6 @@ fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, Error> {
     Ok(sign * (hour * 3600 + minute * 60 + second))
 }
 
-/// Parse transition rule
-fn parse_rule_block(
-    cursor: &mut Cursor,
-    use_string_extensions: bool,
-) -> Result<(RuleDay, i32), Error> {
-    let date = match cursor.peek() {
-        Some(b'M') => {
-            cursor.read_exact(1)?;
-            let month = cursor.read_int()?;
-            cursor.read_tag(b".")?;
-            let week = cursor.read_int()?;
-            cursor.read_tag(b".")?;
-            let week_day = cursor.read_int()?;
-            MonthWeekDay::new(month, week, week_day)?.into()
-        }
-        Some(b'J') => {
-            cursor.read_exact(1)?;
-            Julian1WithoutLeap::new(cursor.read_int()?)?.into()
-        }
-        _ => Julian0WithLeap::new(cursor.read_int()?)?.into(),
-    };
-
-    Ok((
-        date,
-        match (cursor.read_optional_tag(b"/")?, use_string_extensions) {
-            (false, _) => 2 * 3600,
-            (true, true) => parse_rule_time_extended(cursor)?,
-            (true, false) => parse_rule_time(cursor)?,
-        },
-    ))
-}
-
 /// Parse hours, minutes and seconds
 fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), Error> {
     let hour = cursor.read_int()?;
@@ -351,6 +319,35 @@ pub enum RuleDay {
 }
 
 impl RuleDay {
+    /// Parse transition rule
+    fn parse(cursor: &mut Cursor, use_string_extensions: bool) -> Result<(Self, i32), Error> {
+        let date = match cursor.peek() {
+            Some(b'M') => {
+                cursor.read_exact(1)?;
+                let month = cursor.read_int()?;
+                cursor.read_tag(b".")?;
+                let week = cursor.read_int()?;
+                cursor.read_tag(b".")?;
+                let week_day = cursor.read_int()?;
+                MonthWeekDay::new(month, week, week_day)?.into()
+            }
+            Some(b'J') => {
+                cursor.read_exact(1)?;
+                Julian1WithoutLeap::new(cursor.read_int()?)?.into()
+            }
+            _ => Julian0WithLeap::new(cursor.read_int()?)?.into(),
+        };
+
+        Ok((
+            date,
+            match (cursor.read_optional_tag(b"/")?, use_string_extensions) {
+                (false, _) => 2 * 3600,
+                (true, true) => parse_rule_time_extended(cursor)?,
+                (true, false) => parse_rule_time(cursor)?,
+            },
+        ))
+    }
+
     /// Get the transition date for the provided year
     ///
     /// ## Outputs
