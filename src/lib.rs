@@ -128,8 +128,6 @@ use std::io::{self, ErrorKind};
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
 
-use crate::error::TzStringError;
-
 mod datetime;
 pub use datetime::{DateTime, UtcDateTime};
 
@@ -212,7 +210,7 @@ impl<'a> Cursor<'a> {
     }
 
     // Parse an integer out of the ASCII digits
-    pub(crate) fn read_int<T: FromStr<Err = ParseIntError>>(&mut self) -> Result<T, TzStringError> {
+    pub(crate) fn read_int<T: FromStr<Err = ParseIntError>>(&mut self) -> Result<T, Error> {
         let bytes = self.read_while(u8::is_ascii_digit)?;
         Ok(str::from_utf8(bytes)?.parse()?)
     }

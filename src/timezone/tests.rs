@@ -2,7 +2,7 @@ use super::{
     AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LeapSecond, LocalTimeType, MonthWeekDay,
     RuleDay, TimeZone, Transition, TransitionRule, TzAsciiStr,
 };
-use crate::error::{Error, TzStringError};
+use crate::error::Error;
 
 #[test]
 fn test_no_dst() -> Result<(), Error> {
@@ -112,11 +112,11 @@ fn test_all_year_dst() -> Result<(), Error> {
 fn test_error() -> Result<(), Error> {
     assert!(matches!(
         TransitionRule::from_tz_string(b"IST-1GMT0", false),
-        Err(Error::TzStringError(TzStringError::UnsupportedTzString(_)))
+        Err(Error::UnsupportedTzString(_))
     ));
     assert!(matches!(
         TransitionRule::from_tz_string(b"EET-2EEST", false),
-        Err(Error::TzStringError(TzStringError::UnsupportedTzString(_)))
+        Err(Error::UnsupportedTzString(_))
     ));
 
     Ok(())

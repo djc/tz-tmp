@@ -9,11 +9,10 @@ use std::time::SystemTime;
 use std::{fmt, iter, str};
 
 use super::{
-    Cursor, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    Cursor, Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
     SECONDS_PER_DAY,
 };
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
-use crate::error::{Error, TzStringError};
 
 #[cfg(test)]
 mod tests;
@@ -524,7 +523,7 @@ impl AlternateTime {
 }
 
 /// Parse time zone designation
-fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], TzStringError> {
+fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], Error> {
     match cursor.peek() {
         Some(b'<') => {}
         _ => return Ok(cursor.read_while(u8::is_ascii_alphabetic)?),
@@ -537,7 +536,7 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
 }
 
 /// Parse hours, minutes and seconds
-fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
+fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), Error> {
     let hour = cursor.read_int()?;
 
     let mut minute = 0;
@@ -555,7 +554,7 @@ fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), TzStringError> {
 }
 
 /// Parse signed hours, minutes and seconds
-fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzStringError> {
+fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), Error> {
     let mut sign = 1;
     if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.peek() {
         cursor.read_exact(1)?;
@@ -569,51 +568,51 @@ fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), TzSt
 }
 
 /// Parse time zone offset
-fn parse_offset(cursor: &mut Cursor) -> Result<i32, TzStringError> {
+fn parse_offset(cursor: &mut Cursor) -> Result<i32, Error> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
     if !(0..=24).contains(&hour) {
-        return Err(TzStringError::InvalidTzString("invalid offset hour"));
+        return Err(Error::InvalidTzString("invalid offset hour"));
     }
     if !(0..=59).contains(&minute) {
-        return Err(TzStringError::InvalidTzString("invalid offset minute"));
+        return Err(Error::InvalidTzString("invalid offset minute"));
     }
     if !(0..=59).contains(&second) {
-        return Err(TzStringError::InvalidTzString("invalid offset second"));
+        return Err(Error::InvalidTzString("invalid offset second"));
     }
 
     Ok(sign * (hour * 3600 + minute * 60 + second))
 }
 
 /// Parse transition rule time
-fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, TzStringError> {
+fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, Error> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
 
     if !(0..=24).contains(&hour) {
-        return Err(TzStringError::InvalidTzString("invalid day time hour"));
+        return Err(Error::InvalidTzString("invalid day time hour"));
     }
     if !(0..=59).contains(&minute) {
-        return Err(TzStringError::InvalidTzString("invalid day time minute"));
+        return Err(Error::InvalidTzString("invalid day time minute"));
     }
     if !(0..=59).contains(&second) {
-        return Err(TzStringError::InvalidTzString("invalid day time second"));
+        return Err(Error::InvalidTzString("invalid day time second"));
     }
 
     Ok(hour * 3600 + minute * 60 + second)
 }
 
 /// Parse transition rule time with TZ string extensions
-fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
+fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, Error> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
     if !(-167..=167).contains(&hour) {
-        return Err(TzStringError::InvalidTzString("invalid day time hour"));
+        return Err(Error::InvalidTzString("invalid day time hour"));
     }
     if !(0..=59).contains(&minute) {
-        return Err(TzStringError::InvalidTzString("invalid day time minute"));
+        return Err(Error::InvalidTzString("invalid day time minute"));
     }
     if !(0..=59).contains(&second) {
-        return Err(TzStringError::InvalidTzString("invalid day time second"));
+        return Err(Error::InvalidTzString("invalid day time second"));
     }
 
     Ok(sign * (hour * 3600 + minute * 60 + second))
@@ -681,18 +680,16 @@ impl TransitionRule {
             Some(&b',') => std_offset - 3600,
             Some(_) => parse_offset(&mut cursor)?,
             None => {
-                return Err(TzStringError::UnsupportedTzString(
-                    "DST start and end rules must be provided",
+                return Err(
+                    Error::UnsupportedTzString("DST start and end rules must be provided").into()
                 )
-                .into())
             }
         };
 
         if cursor.is_empty() {
-            return Err(TzStringError::UnsupportedTzString(
-                "DST start and end rules must be provided",
-            )
-            .into());
+            return Err(
+                Error::UnsupportedTzString("DST start and end rules must be provided").into()
+            );
         }
 
         cursor.read_tag(b",")?;
@@ -702,9 +699,7 @@ impl TransitionRule {
         let (dst_end, dst_end_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
 
         if !cursor.is_empty() {
-            return Err(
-                TzStringError::InvalidTzString("remaining data after parsing TZ string").into()
-            );
+            return Err(Error::InvalidTzString("remaining data after parsing TZ string").into());
         }
 
         Ok(AlternateTime::new(
@@ -770,7 +765,7 @@ impl TimeZone {
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
     pub fn from_posix_tz(tz_string: &str) -> Result<Self, Error> {
         if tz_string.is_empty() {
-            return Err(Error::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
+            return Err(Error::InvalidTzString("empty TZ string"));
         }
 
         if tz_string == "localtime" {
