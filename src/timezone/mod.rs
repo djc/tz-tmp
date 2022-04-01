@@ -14,8 +14,8 @@ use super::{
 };
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
 use crate::error::{
-    FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
-    TransitionRuleError, TzError, TzFileError, TzStringError,
+    Error, FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TimeZoneError,
+    TransitionRuleError, TzFileError, TzStringError,
 };
 
 #[cfg(test)]
@@ -624,7 +624,7 @@ fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, TzStringError> {
 fn parse_rule_block(
     cursor: &mut Cursor,
     use_string_extensions: bool,
-) -> Result<(RuleDay, i32), TzError> {
+) -> Result<(RuleDay, i32), Error> {
     let date = match cursor.peek() {
         Some(b'M') => {
             cursor.read_exact(1)?;
@@ -666,7 +666,7 @@ impl TransitionRule {
     ///
     /// TZ string extensions from [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536#section-3.3.1) may be used.
     ///
-    fn from_tz_string(tz_string: &[u8], use_string_extensions: bool) -> Result<Self, TzError> {
+    fn from_tz_string(tz_string: &[u8], use_string_extensions: bool) -> Result<Self, Error> {
         let mut cursor = Cursor::new(tz_string);
 
         let std_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
@@ -758,7 +758,7 @@ impl TimeZone {
     ///
     /// This method in not supported on non-UNIX platforms, and returns the UTC time zone instead.
     ///
-    pub fn local() -> Result<Self, TzError> {
+    pub fn local() -> Result<Self, Error> {
         #[cfg(not(unix))]
         let local_time_zone = Self::utc();
 
@@ -769,9 +769,9 @@ impl TimeZone {
     }
 
     /// Construct a time zone from a POSIX TZ string, as described in [the POSIX documentation of the `TZ` environment variable](https://pubs.opengroup.org/onlinepubs/9699919799/basedefs/V1_chap08.html).
-    pub fn from_posix_tz(tz_string: &str) -> Result<Self, TzError> {
+    pub fn from_posix_tz(tz_string: &str) -> Result<Self, Error> {
         if tz_string.is_empty() {
-            return Err(TzError::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
+            return Err(Error::TzStringError(TzStringError::InvalidTzString("empty TZ string")));
         }
 
         if tz_string == "localtime" {
@@ -814,7 +814,7 @@ impl TimeZone {
     }
 
     /// Construct a time zone from the contents of a time zone file
-    pub fn from_file(file: &mut File) -> Result<Self, TzError> {
+    pub fn from_file(file: &mut File) -> Result<Self, Error> {
         let mut bytes = Vec::new();
         file.read_to_end(&mut bytes)?;
         Self::from_tz_data(&bytes)
@@ -823,7 +823,7 @@ impl TimeZone {
     /// Construct a time zone from the contents of a time zone file
     ///
     /// Parse TZif data as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536).
-    pub fn from_tz_data(bytes: &[u8]) -> Result<Self, TzError> {
+    pub fn from_tz_data(bytes: &[u8]) -> Result<Self, Error> {
         let mut cursor = Cursor::new(bytes);
         let data_block = DataBlock::new(&mut cursor, true)?;
         match data_block.header.version {
@@ -864,7 +864,7 @@ impl TimeZone {
     }
 
     /// Find the current local time type associated to the time zone
-    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, TzError> {
+    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, Error> {
         Ok(self.find_local_time_type(
             SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?,
         )?)
@@ -1298,7 +1298,7 @@ impl<'a> DataBlock<'a> {
     }
 
     /// Parse time zone data
-    fn parse(&self, footer: Option<&[u8]>) -> Result<TimeZone, TzError> {
+    fn parse(&self, footer: Option<&[u8]>) -> Result<TimeZone, Error> {
         let mut transitions = Vec::with_capacity(self.header.transition_count);
         for (arr_time, &local_time_type_index) in
             self.transition_times.chunks_exact(self.time_size).zip(self.transition_types)

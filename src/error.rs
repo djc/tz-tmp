@@ -144,7 +144,7 @@ impl From<FindLocalTimeTypeError> for ProjectDateTimeError {
 /// Unified error type for everything in the crate
 #[non_exhaustive]
 #[derive(Debug)]
-pub enum TzError {
+pub enum Error {
     /// UTF-8 error
     Utf8Error(Utf8Error),
     /// Conversion from slice to array error
@@ -173,7 +173,7 @@ pub enum TzError {
     ProjectDateTimeError(ProjectDateTimeError),
 }
 
-impl fmt::Display for TzError {
+impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
             Self::Utf8Error(error) => error.fmt(f),
@@ -193,87 +193,87 @@ impl fmt::Display for TzError {
     }
 }
 
-impl error::Error for TzError {}
+impl error::Error for Error {}
 
-impl From<Utf8Error> for TzError {
+impl From<Utf8Error> for Error {
     fn from(error: Utf8Error) -> Self {
         Self::Utf8Error(error)
     }
 }
 
-impl From<TryFromSliceError> for TzError {
+impl From<TryFromSliceError> for Error {
     fn from(error: TryFromSliceError) -> Self {
         Self::TryFromSliceError(error)
     }
 }
 
-impl From<io::Error> for TzError {
+impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
         Self::IoError(error)
     }
 }
 
-impl From<SystemTimeError> for TzError {
+impl From<SystemTimeError> for Error {
     fn from(error: SystemTimeError) -> Self {
         Self::SystemTimeError(error)
     }
 }
 
-impl From<TzFileError> for TzError {
+impl From<TzFileError> for Error {
     fn from(error: TzFileError) -> Self {
         Self::TzFileError(error)
     }
 }
 
-impl From<TzStringError> for TzError {
+impl From<TzStringError> for Error {
     fn from(error: TzStringError) -> Self {
         Self::TzStringError(error)
     }
 }
 
-impl From<OutOfRangeError> for TzError {
+impl From<OutOfRangeError> for Error {
     fn from(error: OutOfRangeError) -> Self {
         Self::OutOfRangeError(error)
     }
 }
 
-impl From<TryFromIntError> for TzError {
+impl From<TryFromIntError> for Error {
     fn from(_: TryFromIntError) -> Self {
         Self::OutOfRangeError(OutOfRangeError("out of range integer conversion"))
     }
 }
 
-impl From<LocalTimeTypeError> for TzError {
+impl From<LocalTimeTypeError> for Error {
     fn from(error: LocalTimeTypeError) -> Self {
         Self::LocalTimeTypeError(error)
     }
 }
 
-impl From<TransitionRuleError> for TzError {
+impl From<TransitionRuleError> for Error {
     fn from(error: TransitionRuleError) -> Self {
         Self::TransitionRuleError(error)
     }
 }
 
-impl From<TimeZoneError> for TzError {
+impl From<TimeZoneError> for Error {
     fn from(error: TimeZoneError) -> Self {
         Self::TimeZoneError(error)
     }
 }
 
-impl From<DateTimeError> for TzError {
+impl From<DateTimeError> for Error {
     fn from(error: DateTimeError) -> Self {
         Self::DateTimeError(error)
     }
 }
 
-impl From<FindLocalTimeTypeError> for TzError {
+impl From<FindLocalTimeTypeError> for Error {
     fn from(error: FindLocalTimeTypeError) -> Self {
         Self::FindLocalTimeTypeError(error)
     }
 }
 
-impl From<ProjectDateTimeError> for TzError {
+impl From<ProjectDateTimeError> for Error {
     fn from(error: ProjectDateTimeError) -> Self {
         Self::ProjectDateTimeError(error)
     }

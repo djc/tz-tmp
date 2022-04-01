@@ -17,7 +17,7 @@
 //! ## Time zone
 //!
 //! ```rust
-//! # fn main() -> Result<(), tz::TzError> {
+//! # fn main() -> Result<(), tz::Error> {
 //! use tz::TimeZone;
 //!
 //! // 2000-01-01T00:00:00Z
@@ -54,7 +54,7 @@
 //! ## Date time
 //!
 //! ```rust
-//! # fn main() -> Result<(), tz::TzError> {
+//! # fn main() -> Result<(), tz::Error> {
 //! use tz::{DateTime, TimeZone, UtcDateTime};
 //!
 //! // Get the current UTC date time
@@ -124,7 +124,7 @@
 #![warn(unreachable_pub)]
 
 use std::convert::TryInto;
-use std::io::{Error, ErrorKind};
+use std::io::{self, ErrorKind};
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
 
@@ -134,7 +134,7 @@ mod datetime;
 pub use datetime::{DateTime, UtcDateTime};
 
 mod error;
-pub use error::TzError;
+pub use error::Error;
 
 mod timezone;
 pub use timezone::{TimeZone, TimeZoneRef};
@@ -173,28 +173,28 @@ impl<'a> Cursor<'a> {
     }
 
     /// Read exactly `count` bytes, reducing remaining data and incrementing read count
-    pub(crate) fn read_exact(&mut self, count: usize) -> Result<&'a [u8], Error> {
+    pub(crate) fn read_exact(&mut self, count: usize) -> Result<&'a [u8], io::Error> {
         match (self.remaining.get(..count), self.remaining.get(count..)) {
             (Some(result), Some(remaining)) => {
                 self.remaining = remaining;
                 self.read_count += count;
                 Ok(result)
             }
-            _ => Err(Error::from(ErrorKind::UnexpectedEof)),
+            _ => Err(io::Error::from(ErrorKind::UnexpectedEof)),
         }
     }
 
     /// Read bytes and compare them to the provided tag
-    pub(crate) fn read_tag(&mut self, tag: &[u8]) -> Result<(), Error> {
+    pub(crate) fn read_tag(&mut self, tag: &[u8]) -> Result<(), io::Error> {
         if self.read_exact(tag.len())? == tag {
             Ok(())
         } else {
-            Err(Error::from(ErrorKind::InvalidData))
+            Err(io::Error::from(ErrorKind::InvalidData))
         }
     }
 
     /// Read bytes if the remaining data is prefixed by the provided tag
-    pub(crate) fn read_optional_tag(&mut self, tag: &[u8]) -> Result<bool, Error> {
+    pub(crate) fn read_optional_tag(&mut self, tag: &[u8]) -> Result<bool, io::Error> {
         if self.remaining.starts_with(tag) {
             self.read_exact(tag.len())?;
             Ok(true)
@@ -204,7 +204,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Read bytes as long as the provided predicate is true
-    pub(crate) fn read_while<F: Fn(&u8) -> bool>(&mut self, f: F) -> Result<&'a [u8], Error> {
+    pub(crate) fn read_while<F: Fn(&u8) -> bool>(&mut self, f: F) -> Result<&'a [u8], io::Error> {
         match self.remaining.iter().position(|x| !f(x)) {
             None => self.read_exact(self.remaining.len()),
             Some(position) => self.read_exact(position),
@@ -218,7 +218,7 @@ impl<'a> Cursor<'a> {
     }
 
     /// Read bytes until the provided predicate is true
-    pub(crate) fn read_until<F: Fn(&u8) -> bool>(&mut self, f: F) -> Result<&'a [u8], Error> {
+    pub(crate) fn read_until<F: Fn(&u8) -> bool>(&mut self, f: F) -> Result<&'a [u8], io::Error> {
         match self.remaining.iter().position(f) {
             None => self.read_exact(self.remaining.len()),
             Some(position) => self.read_exact(position),

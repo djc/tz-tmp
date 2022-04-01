@@ -1,13 +1,13 @@
 use super::{
-    AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LeapSecond, LocalTimeType,
-    MonthWeekDay, RuleDay, TimeZone, Transition, TransitionRule, TzAsciiStr,
+    AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LeapSecond, LocalTimeType, MonthWeekDay,
+    RuleDay, TimeZone, Transition, TransitionRule, TzAsciiStr,
 };
 use crate::error::{
-    FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TzError, TzStringError,
+    Error, FindLocalTimeTypeError, LocalTimeTypeError, OutOfRangeError, TzStringError,
 };
 
 #[test]
-fn test_no_dst() -> Result<(), TzError> {
+fn test_no_dst() -> Result<(), Error> {
     let tz_string = b"HST10";
     let transition_rule = TransitionRule::from_tz_string(tz_string, false)?;
     assert_eq!(transition_rule, LocalTimeType::new(-36000, false, Some(b"HST"))?.into());
@@ -15,7 +15,7 @@ fn test_no_dst() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_quoted() -> Result<(), TzError> {
+fn test_quoted() -> Result<(), Error> {
     let transition_rule = TransitionRule::from_tz_string(b"<-03>+3<+03>-3,J1,J365", false)?;
     assert_eq!(
         transition_rule,
@@ -33,7 +33,7 @@ fn test_quoted() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_full() -> Result<(), TzError> {
+fn test_full() -> Result<(), Error> {
     let tz_string = b"NZST-12:00:00NZDT-13:00:00,M10.1.0/02:00:00,M3.3.0/02:00:00";
     let transition_rule = TransitionRule::from_tz_string(tz_string, false)?;
     assert_eq!(
@@ -52,7 +52,7 @@ fn test_full() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_negative_dst() -> Result<(), TzError> {
+fn test_negative_dst() -> Result<(), Error> {
     let tz_string = b"IST-1GMT0,M10.5.0,M3.5.0/1";
     let transition_rule = TransitionRule::from_tz_string(tz_string, false)?;
     assert_eq!(
@@ -71,7 +71,7 @@ fn test_negative_dst() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_negative_hour() -> Result<(), TzError> {
+fn test_negative_hour() -> Result<(), Error> {
     let tz_string = b"<-03>3<-02>,M3.5.0/-2,M10.5.0/-1";
     assert!(TransitionRule::from_tz_string(tz_string, false).is_err());
 
@@ -91,7 +91,7 @@ fn test_negative_hour() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_all_year_dst() -> Result<(), TzError> {
+fn test_all_year_dst() -> Result<(), Error> {
     let tz_string = b"EST5EDT,0/0,J365/25";
     assert!(TransitionRule::from_tz_string(tz_string, false).is_err());
 
@@ -111,21 +111,21 @@ fn test_all_year_dst() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_error() -> Result<(), TzError> {
+fn test_error() -> Result<(), Error> {
     assert!(matches!(
         TransitionRule::from_tz_string(b"IST-1GMT0", false),
-        Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))
+        Err(Error::TzStringError(TzStringError::UnsupportedTzString(_)))
     ));
     assert!(matches!(
         TransitionRule::from_tz_string(b"EET-2EEST", false),
-        Err(TzError::TzStringError(TzStringError::UnsupportedTzString(_)))
+        Err(Error::TzStringError(TzStringError::UnsupportedTzString(_)))
     ));
 
     Ok(())
 }
 
 #[test]
-fn test_v1_file_with_leap_seconds() -> Result<(), TzError> {
+fn test_v1_file_with_leap_seconds() -> Result<(), Error> {
     let bytes = b"TZif\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01\0\0\0\x01\0\0\0\x1b\0\0\0\0\0\0\0\x01\0\0\0\x04\0\0\0\0\0\0UTC\0\x04\xb2\x58\0\0\0\0\x01\x05\xa4\xec\x01\0\0\0\x02\x07\x86\x1f\x82\0\0\0\x03\x09\x67\x53\x03\0\0\0\x04\x0b\x48\x86\x84\0\0\0\x05\x0d\x2b\x0b\x85\0\0\0\x06\x0f\x0c\x3f\x06\0\0\0\x07\x10\xed\x72\x87\0\0\0\x08\x12\xce\xa6\x08\0\0\0\x09\x15\x9f\xca\x89\0\0\0\x0a\x17\x80\xfe\x0a\0\0\0\x0b\x19\x62\x31\x8b\0\0\0\x0c\x1d\x25\xea\x0c\0\0\0\x0d\x21\xda\xe5\x0d\0\0\0\x0e\x25\x9e\x9d\x8e\0\0\0\x0f\x27\x7f\xd1\x0f\0\0\0\x10\x2a\x50\xf5\x90\0\0\0\x11\x2c\x32\x29\x11\0\0\0\x12\x2e\x13\x5c\x92\0\0\0\x13\x30\xe7\x24\x13\0\0\0\x14\x33\xb8\x48\x94\0\0\0\x15\x36\x8c\x10\x15\0\0\0\x16\x43\xb7\x1b\x96\0\0\0\x17\x49\x5c\x07\x97\0\0\0\x18\x4f\xef\x93\x18\0\0\0\x19\x55\x93\x2d\x99\0\0\0\x1a\x58\x68\x46\x9a\0\0\0\x1b\0\0";
 
     let time_zone = TimeZone::from_tz_data(bytes)?;
@@ -171,7 +171,7 @@ fn test_v1_file_with_leap_seconds() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_v2_file() -> Result<(), TzError> {
+fn test_v2_file() -> Result<(), Error> {
     let bytes = b"TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x06\0\0\0\x06\0\0\0\0\0\0\0\x07\0\0\0\x06\0\0\0\x14\x80\0\0\0\xbb\x05\x43\x48\xbb\x21\x71\x58\xcb\x89\x3d\xc8\xd2\x23\xf4\x70\xd2\x61\x49\x38\xd5\x8d\x73\x48\x01\x02\x01\x03\x04\x01\x05\xff\xff\x6c\x02\0\0\xff\xff\x6c\x58\0\x04\xff\xff\x7a\x68\x01\x08\xff\xff\x7a\x68\x01\x0c\xff\xff\x7a\x68\x01\x10\xff\xff\x73\x60\0\x04LMT\0HST\0HDT\0HWT\0HPT\0\0\0\0\0\x01\0\0\0\0\0\x01\0TZif2\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x06\0\0\0\x06\0\0\0\0\0\0\0\x07\0\0\0\x06\0\0\0\x14\xff\xff\xff\xff\x74\xe0\x70\xbe\xff\xff\xff\xff\xbb\x05\x43\x48\xff\xff\xff\xff\xbb\x21\x71\x58\xff\xff\xff\xff\xcb\x89\x3d\xc8\xff\xff\xff\xff\xd2\x23\xf4\x70\xff\xff\xff\xff\xd2\x61\x49\x38\xff\xff\xff\xff\xd5\x8d\x73\x48\x01\x02\x01\x03\x04\x01\x05\xff\xff\x6c\x02\0\0\xff\xff\x6c\x58\0\x04\xff\xff\x7a\x68\x01\x08\xff\xff\x7a\x68\x01\x0c\xff\xff\x7a\x68\x01\x10\xff\xff\x73\x60\0\x04LMT\0HST\0HDT\0HWT\0HPT\0\0\0\0\0\x01\0\0\0\0\0\x01\0\x0aHST10\x0a";
 
     let time_zone = TimeZone::from_tz_data(bytes)?;
@@ -213,7 +213,7 @@ fn test_v2_file() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_v3_file() -> Result<(), TzError> {
+fn test_v3_file() -> Result<(), Error> {
     let bytes = b"TZif3\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01\0\0\0\x04\0\0\x1c\x20\0\0IST\0TZif3\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\x01\0\0\0\x01\0\0\0\0\0\0\0\x01\0\0\0\x01\0\0\0\x04\0\0\0\0\x7f\xe8\x17\x80\0\0\0\x1c\x20\0\0IST\0\x01\x01\x0aIST-2IDT,M3.4.4/26,M10.5.0\x0a";
 
     let time_zone = TimeZone::from_tz_data(bytes)?;
@@ -238,7 +238,7 @@ fn test_v3_file() -> Result<(), TzError> {
 }
 
 #[test]
-fn test_tz_ascii_str() -> Result<(), crate::TzError> {
+fn test_tz_ascii_str() -> Result<(), crate::Error> {
     assert!(matches!(TzAsciiStr::new(b""), Err(LocalTimeTypeError(_))));
     assert!(matches!(TzAsciiStr::new(b"1"), Err(LocalTimeTypeError(_))));
     assert!(matches!(TzAsciiStr::new(b"12"), Err(LocalTimeTypeError(_))));
@@ -257,7 +257,7 @@ fn test_tz_ascii_str() -> Result<(), crate::TzError> {
 }
 
 #[test]
-fn test_rule_day() -> Result<(), crate::TzError> {
+fn test_rule_day() -> Result<(), crate::Error> {
     let rule_day_j1 = RuleDay::from(Julian1WithoutLeap::new(60)?);
     assert_eq!(rule_day_j1.transition_date(2000), (3, 1));
     assert_eq!(rule_day_j1.transition_date(2001), (3, 1));
@@ -278,7 +278,7 @@ fn test_rule_day() -> Result<(), crate::TzError> {
 }
 
 #[test]
-fn test_transition_rule() -> Result<(), crate::TzError> {
+fn test_transition_rule() -> Result<(), crate::Error> {
     let transition_rule_fixed = TransitionRule::from(LocalTimeType::new(-36000, false, None)?);
     assert_eq!(transition_rule_fixed.find_local_time_type(0)?.ut_offset(), -36000);
 
@@ -337,14 +337,8 @@ fn test_transition_rule() -> Result<(), crate::TzError> {
         transition_rule_negative_time_2.find_local_time_type(954032399)?.ut_offset(),
         -10800
     );
-    assert_eq!(
-        transition_rule_negative_time_2.find_local_time_type(954032400)?.ut_offset(),
-        -7200
-    );
-    assert_eq!(
-        transition_rule_negative_time_2.find_local_time_type(972781199)?.ut_offset(),
-        -7200
-    );
+    assert_eq!(transition_rule_negative_time_2.find_local_time_type(954032400)?.ut_offset(), -7200);
+    assert_eq!(transition_rule_negative_time_2.find_local_time_type(972781199)?.ut_offset(), -7200);
     assert_eq!(
         transition_rule_negative_time_2.find_local_time_type(972781200)?.ut_offset(),
         -10800
@@ -359,20 +353,14 @@ fn test_transition_rule() -> Result<(), crate::TzError> {
         90000,
     )?);
 
-    assert_eq!(
-        transition_rule_all_year_dst.find_local_time_type(946702799)?.ut_offset(),
-        -14400
-    );
-    assert_eq!(
-        transition_rule_all_year_dst.find_local_time_type(946702800)?.ut_offset(),
-        -14400
-    );
+    assert_eq!(transition_rule_all_year_dst.find_local_time_type(946702799)?.ut_offset(), -14400);
+    assert_eq!(transition_rule_all_year_dst.find_local_time_type(946702800)?.ut_offset(), -14400);
 
     Ok(())
 }
 
 #[test]
-fn test_transition_rule_overflow() -> Result<(), crate::TzError> {
+fn test_transition_rule_overflow() -> Result<(), crate::Error> {
     let transition_rule_1 = TransitionRule::from(AlternateTime::new(
         LocalTimeType::new(-1, false, None)?,
         LocalTimeType::new(-1, true, None)?,
@@ -407,7 +395,7 @@ fn test_transition_rule_overflow() -> Result<(), crate::TzError> {
 }
 
 #[test]
-fn test_time_zone() -> Result<(), crate::TzError> {
+fn test_time_zone() -> Result<(), crate::Error> {
     let utc = LocalTimeType::utc();
     let cet = LocalTimeType::with_ut_offset(3600)?;
 
@@ -447,7 +435,7 @@ fn test_time_zone() -> Result<(), crate::TzError> {
 }
 
 #[test]
-fn test_time_zone_from_posix_tz() -> Result<(), crate::TzError> {
+fn test_time_zone_from_posix_tz() -> Result<(), crate::Error> {
     #[cfg(unix)]
     {
         let time_zone_local = TimeZone::local()?;
@@ -461,7 +449,7 @@ fn test_time_zone_from_posix_tz() -> Result<(), crate::TzError> {
 
         assert!(matches!(
             time_zone_local.find_current_local_time_type(),
-            Ok(_) | Err(TzError::FindLocalTimeTypeError(_))
+            Ok(_) | Err(Error::FindLocalTimeTypeError(_))
         ));
 
         let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
@@ -475,7 +463,7 @@ fn test_time_zone_from_posix_tz() -> Result<(), crate::TzError> {
 }
 
 #[test]
-fn test_leap_seconds() -> Result<(), crate::TzError> {
+fn test_leap_seconds() -> Result<(), crate::Error> {
     let time_zone = TimeZone::new(
         Vec::new(),
         vec![LocalTimeType::new(0, false, Some(b"UTC"))?],
@@ -526,7 +514,7 @@ fn test_leap_seconds() -> Result<(), crate::TzError> {
 }
 
 #[test]
-fn test_leap_seconds_overflow() -> Result<(), crate::TzError> {
+fn test_leap_seconds_overflow() -> Result<(), crate::Error> {
     let time_zone_err = TimeZone::new(
         vec![Transition::new(i64::MIN, 0)],
         vec![LocalTimeType::utc()],
