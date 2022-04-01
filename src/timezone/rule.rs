@@ -40,16 +40,12 @@ impl TransitionRule {
             Some(&b',') => std_offset - 3600,
             Some(_) => parse_offset(&mut cursor)?,
             None => {
-                return Err(
-                    Error::UnsupportedTzString("DST start and end rules must be provided").into()
-                )
+                return Err(Error::UnsupportedTzString("DST start and end rules must be provided"))
             }
         };
 
         if cursor.is_empty() {
-            return Err(
-                Error::UnsupportedTzString("DST start and end rules must be provided").into()
-            );
+            return Err(Error::UnsupportedTzString("DST start and end rules must be provided"));
         }
 
         cursor.read_tag(b",")?;
@@ -59,7 +55,7 @@ impl TransitionRule {
         let (dst_end, dst_end_time) = parse_rule_block(&mut cursor, use_string_extensions)?;
 
         if !cursor.is_empty() {
-            return Err(Error::InvalidTzString("remaining data after parsing TZ string").into());
+            return Err(Error::InvalidTzString("remaining data after parsing TZ string"));
         }
 
         Ok(AlternateTime::new(
@@ -461,7 +457,7 @@ pub struct Julian1WithoutLeap(u16);
 impl Julian1WithoutLeap {
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
     pub fn new(julian_day_1: u16) -> Result<Self, Error> {
-        if !(1 <= julian_day_1 && julian_day_1 <= 365) {
+        if !(1..=365).contains(&julian_day_1) {
             return Err(Error::TransitionRule("invalid rule day julian day"));
         }
 
@@ -508,11 +504,11 @@ pub struct MonthWeekDay {
 impl MonthWeekDay {
     /// Construct a transition rule day represented by a month, a month week and a week day
     pub fn new(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
-        if !(1 <= month && month <= 12) {
+        if !(1..=12).contains(&month) {
             return Err(Error::TransitionRule("invalid rule day month"));
         }
 
-        if !(1 <= week && week <= 5) {
+        if !(1..=5).contains(&week) {
             return Err(Error::TransitionRule("invalid rule day week"));
         }
 

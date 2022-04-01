@@ -249,7 +249,7 @@ impl TimeZone {
         // TZ string extensions are not allowed
         let tz_string = tz_string.trim_matches(|c: char| c.is_ascii_whitespace());
         let rule = TransitionRule::from_tz_string(tz_string.as_bytes(), false)?;
-        Ok(Self::new(
+        Self::new(
             vec![],
             match rule {
                 TransitionRule::Fixed(local_time_type) => vec![local_time_type],
@@ -257,7 +257,7 @@ impl TimeZone {
             },
             vec![],
             Some(rule),
-        )?)
+        )
     }
 
     /// Construct a time zone
@@ -289,10 +289,7 @@ impl TimeZone {
             Version::V1 => match cursor.is_empty() {
                 true => data_block.parse(None),
                 false => {
-                    return Err(Error::InvalidTzFile(
-                        "remaining data after end of TZif v1 data block",
-                    )
-                    .into())
+                    Err(Error::InvalidTzFile("remaining data after end of TZif v1 data block"))
                 }
             },
             Version::V2 | Version::V3 => {
@@ -520,7 +517,7 @@ impl<'a> TimeZoneRef<'a> {
             let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
                 Ok(unix_time) => unix_time,
                 Err(Error::OutOfRange(error)) => return Err(Error::TimeZone(error)),
-                Err(err) => return Err(err.into()),
+                Err(err) => return Err(err),
             };
 
             let rule_local_time_type = match extra_rule.find_local_time_type(unix_time) {
@@ -766,33 +763,32 @@ impl<'a> DataBlock<'a> {
             let is_dst = match arr[4] {
                 0 => false,
                 1 => true,
-                _ => return Err(Error::InvalidTzFile("invalid DST indicator").into()),
+                _ => return Err(Error::InvalidTzFile("invalid DST indicator")),
             };
 
             let char_index = arr[5] as usize;
             if char_index >= self.header.char_count {
-                return Err(Error::InvalidTzFile("invalid time zone designation char index").into());
+                return Err(Error::InvalidTzFile("invalid time zone designation char index"));
             }
 
-            let time_zone_designation =
-                match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
-                    None => {
-                        return Err(Error::InvalidTzFile(
-                            "invalid time zone designation char index",
-                        )
-                        .into())
-                    }
-                    Some(position) => {
-                        let time_zone_designation =
-                            &self.time_zone_designations[char_index..char_index + position];
+            let time_zone_designation = match self.time_zone_designations[char_index..]
+                .iter()
+                .position(|&c| c == b'\0')
+            {
+                None => {
+                    return Err(Error::InvalidTzFile("invalid time zone designation char index"))
+                }
+                Some(position) => {
+                    let time_zone_designation =
+                        &self.time_zone_designations[char_index..char_index + position];
 
-                        if !time_zone_designation.is_empty() {
-                            Some(time_zone_designation)
-                        } else {
-                            None
-                        }
+                    if !time_zone_designation.is_empty() {
+                        Some(time_zone_designation)
+                    } else {
+                        None
                     }
-                };
+                }
+            };
 
             local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
         }
@@ -812,8 +808,7 @@ impl<'a> DataBlock<'a> {
             if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
                 return Err(Error::InvalidTzFile(
                     "invalid couple of standard/wall and UT/local indicators",
-                )
-                .into());
+                ));
             }
         }
 
@@ -821,12 +816,12 @@ impl<'a> DataBlock<'a> {
             Some(footer) => {
                 let footer = str::from_utf8(footer)?;
                 if !(footer.starts_with('\n') && footer.ends_with('\n')) {
-                    return Err(Error::InvalidTzFile("invalid footer").into());
+                    return Err(Error::InvalidTzFile("invalid footer"));
                 }
 
                 let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
                 if tz_string.starts_with(':') || tz_string.contains('\0') {
-                    return Err(Error::InvalidTzFile("invalid footer").into());
+                    return Err(Error::InvalidTzFile("invalid footer"));
                 }
 
                 match tz_string.is_empty() {
@@ -840,7 +835,7 @@ impl<'a> DataBlock<'a> {
             None => None,
         };
 
-        Ok(TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)?)
+        TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)
     }
 }
 

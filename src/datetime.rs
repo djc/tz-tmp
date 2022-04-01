@@ -86,14 +86,14 @@ impl DateTime {
                 Self::from_timespec(unix_time, nanoseconds, time_zone_ref)
             }
             Err(Error::OutOfRange(error)) => Err(Error::ProjectDateTime(error)),
-            Err(err) => return Err(err),
+            Err(err) => Err(err),
         }
     }
 
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, Error> {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)?)
+        Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)
     }
 
     /// Project the date time into another time zone.
@@ -243,10 +243,10 @@ impl UtcDateTime {
             return Err(Error::DateTime("out of range date time"));
         }
 
-        if !(1 <= month && month <= 12) {
+        if !(1..=12).contains(&month) {
             return Err(Error::DateTime("invalid month"));
         }
-        if !(1 <= month_day && month_day <= 31) {
+        if !(1..=31).contains(&month_day) {
             return Err(Error::DateTime("invalid month day"));
         }
         if hour > 23 {
@@ -354,7 +354,7 @@ impl UtcDateTime {
     /// Returns the current UTC date time
     pub fn now() -> Result<Self, Error> {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Ok(Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos())?)
+        Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos())
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
