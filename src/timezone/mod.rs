@@ -284,17 +284,17 @@ impl TimeZone {
     /// Parse TZif data as described in [RFC 8536](https://datatracker.ietf.org/doc/html/rfc8536).
     pub fn from_tz_data(bytes: &[u8]) -> Result<Self, Error> {
         let mut cursor = Cursor::new(bytes);
-        let data_block = DataBlock::new(&mut cursor, true)?;
-        match data_block.header.version {
+        let parser = Parser::new(&mut cursor, true)?;
+        match parser.header.version {
             Version::V1 => match cursor.is_empty() {
-                true => data_block.parse(None),
+                true => parser.parse(None),
                 false => {
                     Err(Error::InvalidTzFile("remaining data after end of TZif v1 data block"))
                 }
             },
             Version::V2 | Version::V3 => {
-                let data_block = DataBlock::new(&mut cursor, false)?;
-                data_block.parse(Some(cursor.remaining()))
+                let parser = Parser::new(&mut cursor, false)?;
+                parser.parse(Some(cursor.remaining()))
             }
         }
     }
@@ -694,7 +694,7 @@ impl Header {
 }
 
 /// TZif data blocks
-struct DataBlock<'a> {
+struct Parser<'a> {
     header: Header,
     /// Time size in bytes
     time_size: usize,
@@ -714,7 +714,7 @@ struct DataBlock<'a> {
     ut_locals: &'a [u8],
 }
 
-impl<'a> DataBlock<'a> {
+impl<'a> Parser<'a> {
     /// Read TZif data blocks
     fn new(cursor: &mut Cursor<'a>, first: bool) -> Result<Self, Error> {
         let header = Header::new(cursor)?;
@@ -745,7 +745,7 @@ impl<'a> DataBlock<'a> {
     }
 
     /// Parse time zone data
-    fn parse(&self, footer: Option<&[u8]>) -> Result<TimeZone, Error> {
+    fn parse(self, footer: Option<&[u8]>) -> Result<TimeZone, Error> {
         let mut transitions = Vec::with_capacity(self.header.transition_count);
         for (arr_time, &local_time_type_index) in
             self.transition_times.chunks_exact(self.time_size).zip(self.transition_types)
