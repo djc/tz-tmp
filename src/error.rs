@@ -54,54 +54,6 @@ impl From<io::Error> for TzStringError {
     }
 }
 
-/// Unified error type for parsing a TZif file
-#[non_exhaustive]
-#[derive(Debug)]
-pub enum TzFileError {
-    /// Conversion from slice to array error
-    TryFromSliceError(TryFromSliceError),
-    /// I/O error
-    IoError(io::Error),
-    /// Unified error for parsing a TZ string
-    TzStringError(TzStringError),
-    /// Invalid TZif file
-    InvalidTzFile(&'static str),
-    /// Unsupported TZif file
-    UnsupportedTzFile(&'static str),
-}
-
-impl fmt::Display for TzFileError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        match self {
-            Self::TryFromSliceError(error) => error.fmt(f),
-            Self::IoError(error) => error.fmt(f),
-            Self::TzStringError(error) => error.fmt(f),
-            Self::InvalidTzFile(error) => write!(f, "invalid TZ file: {}", error),
-            Self::UnsupportedTzFile(error) => write!(f, "unsupported TZ file: {}", error),
-        }
-    }
-}
-
-impl error::Error for TzFileError {}
-
-impl From<TryFromSliceError> for TzFileError {
-    fn from(error: TryFromSliceError) -> Self {
-        Self::TryFromSliceError(error)
-    }
-}
-
-impl From<io::Error> for TzFileError {
-    fn from(error: io::Error) -> Self {
-        Self::IoError(error)
-    }
-}
-
-impl From<TzStringError> for TzFileError {
-    fn from(error: TzStringError) -> Self {
-        Self::TzStringError(error)
-    }
-}
-
 /// Unified error type for everything in the crate
 #[non_exhaustive]
 #[derive(Debug)]
@@ -112,10 +64,10 @@ pub enum Error {
     TryFromSliceError(TryFromSliceError),
     /// I/O error
     IoError(io::Error),
+    /// Invalid Tzif file
+    InvalidTzFile(&'static str),
     /// System time error
     SystemTimeError(SystemTimeError),
-    /// Unified error for parsing a TZif file
-    TzFileError(TzFileError),
     /// Unified error for parsing a TZ string
     TzStringError(TzStringError),
     /// Out of range error
@@ -132,6 +84,8 @@ pub enum Error {
     FindLocalTimeTypeError(&'static str),
     /// Date time projection error
     ProjectDateTimeError(&'static str),
+    /// Unsupported Tzif file
+    UnsupportedTzFile(&'static str),
 }
 
 impl fmt::Display for Error {
@@ -140,8 +94,8 @@ impl fmt::Display for Error {
             Self::Utf8Error(error) => error.fmt(f),
             Self::TryFromSliceError(error) => error.fmt(f),
             Self::IoError(error) => error.fmt(f),
+            Self::InvalidTzFile(error) => error.fmt(f),
             Self::SystemTimeError(error) => error.fmt(f),
-            Self::TzFileError(error) => error.fmt(f),
             Self::TzStringError(error) => error.fmt(f),
             Self::OutOfRangeError(error) => error.fmt(f),
             Self::LocalTimeTypeError(error) => write!(f, "invalid local time type: {}", error),
@@ -150,6 +104,7 @@ impl fmt::Display for Error {
             Self::DateTimeError(error) => write!(f, "invalid date time: {}", error),
             Self::FindLocalTimeTypeError(error) => error.fmt(f),
             Self::ProjectDateTimeError(error) => error.fmt(f),
+            Self::UnsupportedTzFile(error) => error.fmt(f),
         }
     }
 }
@@ -177,12 +132,6 @@ impl From<io::Error> for Error {
 impl From<SystemTimeError> for Error {
     fn from(error: SystemTimeError) -> Self {
         Self::SystemTimeError(error)
-    }
-}
-
-impl From<TzFileError> for Error {
-    fn from(error: TzFileError) -> Self {
-        Self::TzFileError(error)
     }
 }
 

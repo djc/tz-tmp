@@ -13,7 +13,7 @@ use super::{
     SECONDS_PER_DAY,
 };
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
-use crate::error::{Error, TzFileError, TzStringError};
+use crate::error::{Error, TzStringError};
 
 #[cfg(test)]
 mod tests;
@@ -829,7 +829,7 @@ impl TimeZone {
             Version::V1 => match cursor.is_empty() {
                 true => data_block.parse(None),
                 false => {
-                    return Err(TzFileError::InvalidTzFile(
+                    return Err(Error::InvalidTzFile(
                         "remaining data after end of TZif v1 data block",
                     )
                     .into())
@@ -1146,7 +1146,7 @@ impl<'a> TimeZoneRef<'a> {
 }
 
 /// Open the TZif file corresponding to a TZ string
-pub(crate) fn find_tz_file(path: impl AsRef<Path>) -> Result<File, TzFileError> {
+pub(crate) fn find_tz_file(path: impl AsRef<Path>) -> Result<File, Error> {
     // Don't check system timezone directories on non-UNIX platforms
     #[cfg(not(unix))]
     return Ok(File::open(path)?);
@@ -1164,7 +1164,7 @@ pub(crate) fn find_tz_file(path: impl AsRef<Path>) -> Result<File, TzFileError> 
             }
         }
 
-        Err(TzFileError::IoError(io::ErrorKind::NotFound.into()))
+        Err(Error::IoError(io::ErrorKind::NotFound.into()))
     }
 }
 
@@ -1204,17 +1204,17 @@ struct Header {
 }
 
 impl Header {
-    fn new(cursor: &mut Cursor) -> Result<Self, TzFileError> {
+    fn new(cursor: &mut Cursor) -> Result<Self, Error> {
         let magic = cursor.read_exact(4)?;
         if magic != *b"TZif" {
-            return Err(TzFileError::InvalidTzFile("invalid magic number"));
+            return Err(Error::InvalidTzFile("invalid magic number"));
         }
 
         let version = match cursor.read_exact(1)? {
             [0x00] => Version::V1,
             [0x32] => Version::V2,
             [0x33] => Version::V3,
-            _ => return Err(TzFileError::UnsupportedTzFile("unsupported TZif version")),
+            _ => return Err(Error::UnsupportedTzFile("unsupported TZif version")),
         };
 
         cursor.read_exact(15)?;
@@ -1230,7 +1230,7 @@ impl Header {
             && (ut_local_count == 0 || ut_local_count == type_count)
             && (std_wall_count == 0 || std_wall_count == type_count))
         {
-            return Err(TzFileError::InvalidTzFile("invalid header"));
+            return Err(Error::InvalidTzFile("invalid header"));
         }
 
         Ok(Self {
@@ -1268,7 +1268,7 @@ struct DataBlock<'a> {
 
 impl<'a> DataBlock<'a> {
     /// Read TZif data blocks
-    fn new(cursor: &mut Cursor<'a>, first: bool) -> Result<Self, TzFileError> {
+    fn new(cursor: &mut Cursor<'a>, first: bool) -> Result<Self, Error> {
         let header = Header::new(cursor)?;
         let time_size = match first {
             true => 4, // We always parse V1 first
@@ -1289,7 +1289,7 @@ impl<'a> DataBlock<'a> {
     }
 
     /// Parse time values
-    fn parse_time(&self, arr: &[u8], version: Version) -> Result<i64, TzFileError> {
+    fn parse_time(&self, arr: &[u8], version: Version) -> Result<i64, Error> {
         Ok(match version {
             Version::V1 => i32::from_be_bytes(arr.try_into()?).into(),
             Version::V2 | Version::V3 => i64::from_be_bytes(arr.try_into()?),
@@ -1315,20 +1315,18 @@ impl<'a> DataBlock<'a> {
             let is_dst = match arr[4] {
                 0 => false,
                 1 => true,
-                _ => return Err(TzFileError::InvalidTzFile("invalid DST indicator").into()),
+                _ => return Err(Error::InvalidTzFile("invalid DST indicator").into()),
             };
 
             let char_index = arr[5] as usize;
             if char_index >= self.header.char_count {
-                return Err(
-                    TzFileError::InvalidTzFile("invalid time zone designation char index").into()
-                );
+                return Err(Error::InvalidTzFile("invalid time zone designation char index").into());
             }
 
             let time_zone_designation =
                 match self.time_zone_designations[char_index..].iter().position(|&c| c == b'\0') {
                     None => {
-                        return Err(TzFileError::InvalidTzFile(
+                        return Err(Error::InvalidTzFile(
                             "invalid time zone designation char index",
                         )
                         .into())
@@ -1361,7 +1359,7 @@ impl<'a> DataBlock<'a> {
         for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(self.header.type_count)
         {
             if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
-                return Err(TzFileError::InvalidTzFile(
+                return Err(Error::InvalidTzFile(
                     "invalid couple of standard/wall and UT/local indicators",
                 )
                 .into());
@@ -1372,12 +1370,12 @@ impl<'a> DataBlock<'a> {
             Some(footer) => {
                 let footer = str::from_utf8(footer)?;
                 if !(footer.starts_with('\n') && footer.ends_with('\n')) {
-                    return Err(TzFileError::InvalidTzFile("invalid footer").into());
+                    return Err(Error::InvalidTzFile("invalid footer").into());
                 }
 
                 let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
                 if tz_string.starts_with(':') || tz_string.contains('\0') {
-                    return Err(TzFileError::InvalidTzFile("invalid footer").into());
+                    return Err(Error::InvalidTzFile("invalid footer").into());
                 }
 
                 match tz_string.is_empty() {

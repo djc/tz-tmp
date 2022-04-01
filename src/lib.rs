@@ -128,7 +128,7 @@ use std::io::{self, ErrorKind};
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
 
-use crate::error::{TzFileError, TzStringError};
+use crate::error::TzStringError;
 
 mod datetime;
 pub use datetime::{DateTime, UtcDateTime};
@@ -168,7 +168,7 @@ impl<'a> Cursor<'a> {
         self.remaining.is_empty()
     }
 
-    pub(crate) fn read_be_u32(&mut self) -> Result<u32, TzFileError> {
+    pub(crate) fn read_be_u32(&mut self) -> Result<u32, Error> {
         Ok(u32::from_be_bytes(self.read_exact(4)?.try_into()?))
     }
 
