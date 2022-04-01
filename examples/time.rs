@@ -1,3 +1,6 @@
+use std::time::SystemTime;
+use std::convert::TryInto;
+
 use tz::{DateTime, Error, TimeZone, UtcDateTime};
 
 fn main() -> Result<(), Error> {
@@ -21,7 +24,9 @@ fn main() -> Result<(), Error> {
     println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
 
     // Get the current local time type
-    let current_local_time_type = time_zone_local.find_current_local_time_type()?;
+    let unix_now =
+        SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
+    let current_local_time_type = time_zone_local.find_local_time_type(unix_now)?;
     println!("{:?}", current_local_time_type);
 
     // Get time zone from a TZ string:

@@ -17,6 +17,9 @@
 //! ## Time zone
 //!
 //! ```rust
+//! # use std::time::SystemTime;
+//! # use std::convert::TryInto;
+//! #
 //! # fn main() -> Result<(), tz::Error> {
 //! use tz::TimeZone;
 //!
@@ -34,7 +37,9 @@
 //! // Get local time zone (UNIX only)
 //! let time_zone_local = TimeZone::local()?;
 //! // Get the current local time type
-//! let _current_local_time_type = time_zone_local.find_current_local_time_type()?;
+//! let unix_now =
+//!     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
+//! let _current_local_time_type = time_zone_local.find_local_time_type(unix_now)?;
 //!
 //! // Get time zone from a TZ string:
 //! // From an absolute file

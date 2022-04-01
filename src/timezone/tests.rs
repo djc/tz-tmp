@@ -445,11 +445,6 @@ fn test_time_zone_from_posix_tz() -> Result<(), Error> {
         assert_eq!(time_zone_local, time_zone_local_2);
         assert_eq!(time_zone_local, time_zone_local_3);
 
-        assert!(matches!(
-            time_zone_local.find_current_local_time_type(),
-            Ok(_) | Err(Error::FindLocalTimeType(_))
-        ));
-
         let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
         assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
     }

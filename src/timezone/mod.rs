@@ -5,7 +5,6 @@ use std::convert::TryInto;
 use std::fs::{self, File};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 use std::{fmt, iter, str};
 
 use super::{
@@ -853,13 +852,6 @@ impl TimeZone {
             leap_seconds: Vec::new(),
             extra_rule: None,
         }
-    }
-
-    /// Find the current local time type associated to the time zone
-    pub fn find_current_local_time_type(&self) -> Result<&LocalTimeType, Error> {
-        Ok(self.find_local_time_type(
-            SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?,
-        )?)
     }
 
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
