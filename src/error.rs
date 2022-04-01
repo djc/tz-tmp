@@ -11,33 +11,33 @@ use std::{error, fmt, io};
 #[derive(Debug)]
 pub enum Error {
     /// UTF-8 error
-    Utf8Error(Utf8Error),
+    Utf8(Utf8Error),
     /// Conversion from slice to array error
-    TryFromSliceError(TryFromSliceError),
+    TryFromSlice(TryFromSliceError),
     /// I/O error
-    IoError(io::Error),
+    Io(io::Error),
     /// Invalid Tzif file
     InvalidTzFile(&'static str),
     /// System time error
-    SystemTimeError(SystemTimeError),
+    SystemTime(SystemTimeError),
     /// Out of range error
-    OutOfRangeError(&'static str),
+    OutOfRange(&'static str),
     /// Local time type error
-    LocalTimeTypeError(&'static str),
+    LocalTimeType(&'static str),
     /// Transition rule error
-    TransitionRuleError(&'static str),
+    TransitionRule(&'static str),
     /// Time zone error
-    TimeZoneError(&'static str),
+    TimeZone(&'static str),
     /// Date time error
-    DateTimeError(&'static str),
+    DateTime(&'static str),
     /// Local time type search error
-    FindLocalTimeTypeError(&'static str),
+    FindLocalTimeType(&'static str),
     /// Date time projection error
-    ProjectDateTimeError(&'static str),
+    ProjectDateTime(&'static str),
     /// Unsupported Tzif file
     UnsupportedTzFile(&'static str),
     /// Integer parsing error
-    ParseIntError(ParseIntError),
+    ParseInt(ParseIntError),
     /// Invalid TZ string
     InvalidTzString(&'static str),
     /// Unsupported TZ string
@@ -47,20 +47,20 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Utf8Error(error) => error.fmt(f),
-            Self::TryFromSliceError(error) => error.fmt(f),
-            Self::IoError(error) => error.fmt(f),
+            Self::Utf8(error) => error.fmt(f),
+            Self::TryFromSlice(error) => error.fmt(f),
+            Self::Io(error) => error.fmt(f),
             Self::InvalidTzFile(error) => error.fmt(f),
-            Self::SystemTimeError(error) => error.fmt(f),
-            Self::OutOfRangeError(error) => error.fmt(f),
-            Self::LocalTimeTypeError(error) => write!(f, "invalid local time type: {}", error),
-            Self::TransitionRuleError(error) => write!(f, "invalid transition rule: {}", error),
-            Self::TimeZoneError(error) => write!(f, "invalid time zone: {}", error),
-            Self::DateTimeError(error) => write!(f, "invalid date time: {}", error),
-            Self::FindLocalTimeTypeError(error) => error.fmt(f),
-            Self::ProjectDateTimeError(error) => error.fmt(f),
+            Self::SystemTime(error) => error.fmt(f),
+            Self::OutOfRange(error) => error.fmt(f),
+            Self::LocalTimeType(error) => write!(f, "invalid local time type: {}", error),
+            Self::TransitionRule(error) => write!(f, "invalid transition rule: {}", error),
+            Self::TimeZone(error) => write!(f, "invalid time zone: {}", error),
+            Self::DateTime(error) => write!(f, "invalid date time: {}", error),
+            Self::FindLocalTimeType(error) => error.fmt(f),
+            Self::ProjectDateTime(error) => error.fmt(f),
             Self::UnsupportedTzFile(error) => error.fmt(f),
-            Self::ParseIntError(error) => error.fmt(f),
+            Self::ParseInt(error) => error.fmt(f),
             Self::InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
             Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
         }
@@ -71,36 +71,36 @@ impl error::Error for Error {}
 
 impl From<Utf8Error> for Error {
     fn from(error: Utf8Error) -> Self {
-        Self::Utf8Error(error)
+        Self::Utf8(error)
     }
 }
 
 impl From<TryFromSliceError> for Error {
     fn from(error: TryFromSliceError) -> Self {
-        Self::TryFromSliceError(error)
+        Self::TryFromSlice(error)
     }
 }
 
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
-        Self::IoError(error)
+        Self::Io(error)
     }
 }
 
 impl From<SystemTimeError> for Error {
     fn from(error: SystemTimeError) -> Self {
-        Self::SystemTimeError(error)
+        Self::SystemTime(error)
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(error: ParseIntError) -> Self {
-        Self::ParseIntError(error)
+        Self::ParseInt(error)
     }
 }
 
 impl From<TryFromIntError> for Error {
     fn from(_: TryFromIntError) -> Self {
-        Self::OutOfRangeError("out of range integer conversion")
+        Self::OutOfRange("out of range integer conversion")
     }
 }
