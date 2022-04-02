@@ -146,16 +146,6 @@ pub struct TimeZoneRef<'a> {
 }
 
 impl<'a> TimeZoneRef<'a> {
-    /// Construct the time zone reference associated to UTC
-    pub const fn utc() -> Self {
-        Self {
-            transitions: &[],
-            local_time_types: &[UTC_TYPE],
-            leap_seconds: &[],
-            extra_rule: &None,
-        }
-    }
-
     /// Returns list of transitions
     pub fn transitions(&self) -> &'a [Transition] {
         self.transitions
@@ -248,7 +238,7 @@ impl<'a> TimeZoneRef<'a> {
         // Check leap seconds
         if !(self.leap_seconds.is_empty()
             || self.leap_seconds[0].unix_leap_time >= 0
-                && self.leap_seconds[0].correction.saturating_abs() == 1)
+                && saturating_abs(self.leap_seconds[0].correction) == 1)
         {
             return Err(Error::TimeZone("invalid leap second"));
         }
@@ -263,7 +253,7 @@ impl<'a> TimeZoneRef<'a> {
 
                 let diff_unix_leap_time = x1.unix_leap_time.saturating_sub(x0.unix_leap_time);
                 let abs_diff_correction =
-                    x1.correction.saturating_sub(x0.correction).saturating_abs();
+                    saturating_abs(x1.correction.saturating_sub(x0.correction));
 
                 if !(diff_unix_leap_time >= min_interval && abs_diff_correction == 1) {
                     return Err(Error::TimeZone("invalid leap second"));
@@ -313,7 +303,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Convert Unix time to Unix leap time, from the list of leap seconds in a time zone
-    const fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, Error> {
+    fn unix_time_to_unix_leap_time(&self, unix_time: i64) -> Result<i64, Error> {
         let mut unix_leap_time = unix_time;
 
         let mut i = 0;
@@ -337,7 +327,7 @@ impl<'a> TimeZoneRef<'a> {
 
     /// Convert Unix leap time to Unix time, from the list of leap seconds in a time zone
     fn unix_leap_time_to_unix_time(&self, unix_leap_time: i64) -> Result<i64, Error> {
-        if unix_leap_time == i64::MIN {
+        if unix_leap_time == i64::min_value() {
             return Err(Error::OutOfRange("out of range operation"));
         }
 
@@ -356,6 +346,14 @@ impl<'a> TimeZoneRef<'a> {
             None => Err(Error::OutOfRange("out of range operation")),
         }
     }
+
+    /// The UTC time zone
+    pub const UTC: TimeZoneRef<'static> = TimeZoneRef {
+        transitions: &[],
+        local_time_types: &[UTC_TYPE],
+        leap_seconds: &[],
+        extra_rule: &None,
+    };
 }
 
 /// Transition of a TZif file
@@ -419,7 +417,7 @@ struct TzAsciiStr {
 
 impl TzAsciiStr {
     /// Construct a time zone designation string
-    const fn new(input: &[u8]) -> Result<Self, Error> {
+    fn new(input: &[u8]) -> Result<Self, Error> {
         let len = input.len();
 
         if !(3 <= len && len <= 7) {
@@ -434,13 +432,14 @@ impl TzAsciiStr {
         let mut i = 0;
         while i < len {
             let b = input[i];
-
-            if !matches!(b, b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-') {
-                return Err(Error::LocalTimeType("invalid characters in time zone designation"));
+            match b {
+                b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-' => {}
+                _ => {
+                    return Err(Error::LocalTimeType("invalid characters in time zone designation"))
+                }
             }
 
             bytes[i + 1] = b;
-
             i += 1;
         }
 
@@ -448,26 +447,26 @@ impl TzAsciiStr {
     }
 
     /// Returns time zone designation as a byte slice
-    const fn as_bytes(&self) -> &[u8] {
-        match &self.bytes {
-            [3, head @ .., _, _, _, _] => head,
-            [4, head @ .., _, _, _] => head,
-            [5, head @ .., _, _] => head,
-            [6, head @ .., _] => head,
-            [7, head @ ..] => head,
+    fn as_bytes(&self) -> &[u8] {
+        match self.bytes[0] {
+            3 => &self.bytes[1..4],
+            4 => &self.bytes[1..5],
+            5 => &self.bytes[1..6],
+            6 => &self.bytes[1..7],
+            7 => &self.bytes[1..8],
             _ => unreachable!(),
         }
     }
 
     /// Returns time zone designation as a string
-    const fn as_str(&self) -> &str {
+    fn as_str(&self) -> &str {
         // SAFETY: ASCII is valid UTF-8
         unsafe { str::from_utf8_unchecked(self.as_bytes()) }
     }
 
     /// Check if two time zone designations are equal
-    const fn equal(&self, other: &Self) -> bool {
-        u64::from_ne_bytes(self.bytes) == u64::from_ne_bytes(other.bytes)
+    fn equal(&self, other: &Self) -> bool {
+        self.bytes == other.bytes
     }
 }
 
@@ -495,7 +494,7 @@ impl LocalTimeType {
         is_dst: bool,
         time_zone_designation: Option<&[u8]>,
     ) -> Result<Self, Error> {
-        if ut_offset == i32::MIN {
+        if ut_offset == i32::min_value() {
             return Err(Error::LocalTimeType("invalid UTC offset"));
         }
 
@@ -514,7 +513,7 @@ impl LocalTimeType {
 
     /// Construct a local time type with the specified UTC offset in seconds
     pub fn with_ut_offset(ut_offset: i32) -> Result<Self, Error> {
-        if ut_offset == i32::MIN {
+        if ut_offset == i32::min_value() {
             return Err(Error::LocalTimeType("invalid UTC offset"));
         }
 
@@ -563,6 +562,17 @@ fn find_tz_file(path: impl AsRef<Path>) -> Result<File, Error> {
     }
 }
 
+#[inline]
+fn saturating_abs(v: i32) -> i32 {
+    if v.is_positive() {
+        v
+    } else if v == i32::min_value() {
+        i32::max_value()
+    } else {
+        -v
+    }
+}
+
 // Possible system timezone directories
 #[cfg(unix)]
 const ZONE_INFO_DIRECTORIES: [&str; 3] =
@@ -578,7 +588,7 @@ const UTC_TYPE: LocalTimeType = LocalTimeType::utc();
 #[cfg(test)]
 mod tests {
     use super::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzAsciiStr};
-    use crate::Error;
+    use crate::{matches, Error};
 
     #[test]
     fn test_no_dst() -> Result<(), Error> {
@@ -723,7 +733,7 @@ mod tests {
         let time_zone_3 =
             TimeZone::new(vec![Transition::new(0, 0)], utc_local_time_types.clone(), vec![], None)?;
         let time_zone_4 = TimeZone::new(
-            vec![Transition::new(i32::MIN.into(), 0), Transition::new(0, 1)],
+            vec![Transition::new(i32::min_value().into(), 0), Transition::new(0, 1)],
             vec![utc, cet],
             Vec::new(),
             Some(fixed_extra_rule),
@@ -826,7 +836,7 @@ mod tests {
     #[test]
     fn test_leap_seconds_overflow() -> Result<(), Error> {
         let time_zone_err = TimeZone::new(
-            vec![Transition::new(i64::MIN, 0)],
+            vec![Transition::new(i64::min_value(), 0)],
             vec![LocalTimeType::utc()],
             vec![LeapSecond::new(0, 1)],
             Some(TransitionRule::from(LocalTimeType::utc())),
@@ -834,13 +844,13 @@ mod tests {
         assert!(time_zone_err.is_err());
 
         let time_zone = TimeZone::new(
-            vec![Transition::new(i64::MAX, 0)],
+            vec![Transition::new(i64::max_value(), 0)],
             vec![LocalTimeType::utc()],
             vec![LeapSecond::new(0, 1)],
             None,
         )?;
         assert!(matches!(
-            time_zone.find_local_time_type(i64::MAX),
+            time_zone.find_local_time_type(i64::max_value()),
             Err(Error::FindLocalTimeType(_))
         ));
 

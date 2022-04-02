@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::time::SystemTime;
 
 use tz::{DateTime, Error, TimeZone, UtcDateTime};
@@ -24,8 +23,12 @@ fn main() -> Result<(), Error> {
     println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
 
     // Get the current local time type
-    let unix_now =
-        SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
+    let unix_now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
+    let unix_now = match unix_now <= i64::max_value() as u64 {
+        true => unix_now as i64,
+        false => return Err(Error::OutOfRange("u64 out of range for i64")),
+    };
+
     let current_local_time_type = time_zone_local.find_local_time_type(unix_now)?;
     println!("{:?}", current_local_time_type);
 

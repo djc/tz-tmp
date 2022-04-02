@@ -18,7 +18,6 @@
 //!
 //! ```rust
 //! # use std::time::SystemTime;
-//! # use std::convert::TryInto;
 //! #
 //! # fn main() -> Result<(), tz::Error> {
 //! use tz::TimeZone;
@@ -37,8 +36,11 @@
 //! // Get local time zone (UNIX only)
 //! let time_zone_local = TimeZone::local()?;
 //! // Get the current local time type
-//! let unix_now =
-//!     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs().try_into()?;
+//! let unix_now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
+//! let unix_now = match unix_now < i64::max_value() as u64 {
+//!     true => unix_now as i64,
+//!     false => return Err(tz::Error::OutOfRange("u64 out of range for i64")),
+//! };
 //! let _current_local_time_type = time_zone_local.find_local_time_type(unix_now)?;
 //!
 //! // Get time zone from a TZ string:
@@ -128,8 +130,7 @@
 
 #![warn(unreachable_pub)]
 
-use std::array::TryFromSliceError;
-use std::num::{ParseIntError, TryFromIntError};
+use std::num::ParseIntError;
 use std::str::Utf8Error;
 use std::time::SystemTimeError;
 use std::{error, fmt, io};
@@ -144,7 +145,6 @@ mod parser;
 mod rule;
 
 /// Unified error type for everything in the crate
-#[non_exhaustive]
 #[derive(Debug)]
 pub enum Error {
     /// Date time error
@@ -153,6 +153,8 @@ pub enum Error {
     FindLocalTimeType(&'static str),
     /// Local time type error
     LocalTimeType(&'static str),
+    /// Invalid slice for integer conversion
+    InvalidSlice(&'static str),
     /// Invalid Tzif file
     InvalidTzFile(&'static str),
     /// Invalid TZ string
@@ -171,8 +173,6 @@ pub enum Error {
     TimeZone(&'static str),
     /// Transition rule error
     TransitionRule(&'static str),
-    /// Conversion from slice to array error
-    TryFromSlice(TryFromSliceError),
     /// Unsupported Tzif file
     UnsupportedTzFile(&'static str),
     /// Unsupported TZ string
@@ -183,23 +183,24 @@ pub enum Error {
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        use Error::*;
         match self {
-            Self::DateTime(error) => write!(f, "invalid date time: {}", error),
-            Self::FindLocalTimeType(error) => error.fmt(f),
-            Self::LocalTimeType(error) => write!(f, "invalid local time type: {}", error),
-            Self::InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
-            Self::InvalidTzFile(error) => error.fmt(f),
-            Self::Io(error) => error.fmt(f),
-            Self::OutOfRange(error) => error.fmt(f),
-            Self::ParseInt(error) => error.fmt(f),
-            Self::ProjectDateTime(error) => error.fmt(f),
-            Self::SystemTime(error) => error.fmt(f),
-            Self::TransitionRule(error) => write!(f, "invalid transition rule: {}", error),
-            Self::TimeZone(error) => write!(f, "invalid time zone: {}", error),
-            Self::TryFromSlice(error) => error.fmt(f),
-            Self::UnsupportedTzFile(error) => error.fmt(f),
-            Self::UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
-            Self::Utf8(error) => error.fmt(f),
+            DateTime(error) => write!(f, "invalid date time: {}", error),
+            FindLocalTimeType(error) => error.fmt(f),
+            LocalTimeType(error) => write!(f, "invalid local time type: {}", error),
+            InvalidSlice(error) => error.fmt(f),
+            InvalidTzString(error) => write!(f, "invalid TZ string: {}", error),
+            InvalidTzFile(error) => error.fmt(f),
+            Io(error) => error.fmt(f),
+            OutOfRange(error) => error.fmt(f),
+            ParseInt(error) => error.fmt(f),
+            ProjectDateTime(error) => error.fmt(f),
+            SystemTime(error) => error.fmt(f),
+            TransitionRule(error) => write!(f, "invalid transition rule: {}", error),
+            TimeZone(error) => write!(f, "invalid time zone: {}", error),
+            UnsupportedTzFile(error) => error.fmt(f),
+            UnsupportedTzString(error) => write!(f, "unsupported TZ string: {}", error),
+            Utf8(error) => error.fmt(f),
         }
     }
 }
@@ -208,37 +209,52 @@ impl error::Error for Error {}
 
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Self {
-        Self::Io(error)
+        Error::Io(error)
     }
 }
 
 impl From<ParseIntError> for Error {
     fn from(error: ParseIntError) -> Self {
-        Self::ParseInt(error)
+        Error::ParseInt(error)
     }
 }
 
 impl From<SystemTimeError> for Error {
     fn from(error: SystemTimeError) -> Self {
-        Self::SystemTime(error)
-    }
-}
-
-impl From<TryFromIntError> for Error {
-    fn from(_: TryFromIntError) -> Self {
-        Self::OutOfRange("out of range integer conversion")
-    }
-}
-
-impl From<TryFromSliceError> for Error {
-    fn from(error: TryFromSliceError) -> Self {
-        Self::TryFromSlice(error)
+        Error::SystemTime(error)
     }
 }
 
 impl From<Utf8Error> for Error {
     fn from(error: Utf8Error) -> Self {
-        Self::Utf8(error)
+        Error::Utf8(error)
+    }
+}
+
+// MSRV: 1.38
+#[inline]
+fn rem_euclid(v: i64, rhs: i64) -> i64 {
+    let r = v % rhs;
+    if r < 0 {
+        if rhs < 0 {
+            r - rhs
+        } else {
+            r + rhs
+        }
+    } else {
+        r
+    }
+}
+
+/// MSRV 1.42
+#[cfg(test)]
+#[macro_export]
+macro_rules! matches {
+    ($expression:expr, $(|)? $( $pattern:pat )|+ $( if $guard: expr )? $(,)?) => {
+        match $expression {
+            $( $pattern )|+ $( if $guard )? => true,
+            _ => false
+        }
     }
 }
 

@@ -4,7 +4,7 @@ use super::parser::Cursor;
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
 use crate::timezone::{LocalTimeType, SECONDS_PER_WEEK};
 use crate::{
-    Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    rem_euclid, Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
     SECONDS_PER_DAY,
 };
 
@@ -73,21 +73,23 @@ impl TransitionRule {
     /// Find the local time type associated to the transition rule at the specified Unix time in seconds
     pub(super) fn find_local_time_type(&self, unix_time: i64) -> Result<&LocalTimeType, Error> {
         match self {
-            Self::Fixed(local_time_type) => Ok(local_time_type),
-            Self::Alternate(alternate_time) => alternate_time.find_local_time_type(unix_time),
+            TransitionRule::Fixed(local_time_type) => Ok(local_time_type),
+            TransitionRule::Alternate(alternate_time) => {
+                alternate_time.find_local_time_type(unix_time)
+            }
         }
     }
 }
 
 impl From<LocalTimeType> for TransitionRule {
     fn from(inner: LocalTimeType) -> Self {
-        Self::Fixed(inner)
+        TransitionRule::Fixed(inner)
     }
 }
 
 impl From<AlternateTime> for TransitionRule {
     fn from(inner: AlternateTime) -> Self {
-        Self::Alternate(inner)
+        TransitionRule::Alternate(inner)
     }
 }
 
@@ -140,7 +142,7 @@ impl AlternateTime {
         };
 
         // Check if the current year is valid for the following computations
-        if !(i32::MIN + 2 <= current_year && current_year <= i32::MAX - 2) {
+        if !(i32::min_value() + 2 <= current_year && current_year <= i32::max_value() - 2) {
             return Err(Error::OutOfRange("out of range date time"));
         }
 
@@ -229,13 +231,13 @@ fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], 
 fn parse_offset(cursor: &mut Cursor) -> Result<i32, Error> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
-    if !(0..=24).contains(&hour) {
+    if hour < 0 || hour > 24 {
         return Err(Error::InvalidTzString("invalid offset hour"));
     }
-    if !(0..=59).contains(&minute) {
+    if minute < 0 || minute > 59 {
         return Err(Error::InvalidTzString("invalid offset minute"));
     }
-    if !(0..=59).contains(&second) {
+    if second < 0 || second > 59 {
         return Err(Error::InvalidTzString("invalid offset second"));
     }
 
@@ -246,13 +248,13 @@ fn parse_offset(cursor: &mut Cursor) -> Result<i32, Error> {
 fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, Error> {
     let (hour, minute, second) = parse_hhmmss(cursor)?;
 
-    if !(0..=24).contains(&hour) {
+    if hour < 0 || hour > 24 {
         return Err(Error::InvalidTzString("invalid day time hour"));
     }
-    if !(0..=59).contains(&minute) {
+    if minute < 0 || minute > 59 {
         return Err(Error::InvalidTzString("invalid day time minute"));
     }
-    if !(0..=59).contains(&second) {
+    if second < 0 || second > 59 {
         return Err(Error::InvalidTzString("invalid day time second"));
     }
 
@@ -263,13 +265,13 @@ fn parse_rule_time(cursor: &mut Cursor) -> Result<i32, Error> {
 fn parse_rule_time_extended(cursor: &mut Cursor) -> Result<i32, Error> {
     let (sign, hour, minute, second) = parse_signed_hhmmss(cursor)?;
 
-    if !(-167..=167).contains(&hour) {
+    if hour < -167 || hour > 167 {
         return Err(Error::InvalidTzString("invalid day time hour"));
     }
-    if !(0..=59).contains(&minute) {
+    if minute < 0 || minute > 59 {
         return Err(Error::InvalidTzString("invalid day time minute"));
     }
-    if !(0..=59).contains(&second) {
+    if second < 0 || second > 59 {
         return Err(Error::InvalidTzString("invalid day time second"));
     }
 
@@ -297,10 +299,12 @@ fn parse_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32), Error> {
 /// Parse signed hours, minutes and seconds
 fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), Error> {
     let mut sign = 1;
-    if let Some(&c @ b'+') | Some(&c @ b'-') = cursor.peek() {
-        cursor.read_exact(1)?;
-        if c == b'-' {
-            sign = -1;
+    if let Some(&c) = cursor.peek() {
+        if c == b'+' || c == b'-' {
+            cursor.read_exact(1)?;
+            if c == b'-' {
+                sign = -1;
+            }
         }
     }
 
@@ -358,11 +362,11 @@ impl RuleDay {
 
     /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
     fn julian_1(julian_day_1: u16) -> Result<Self, Error> {
-        if !(1..=365).contains(&julian_day_1) {
+        if julian_day_1 < 1 || julian_day_1 > 365 {
             return Err(Error::TransitionRule("invalid rule day julian day"));
         }
 
-        Ok(Self::Julian1WithoutLeap(julian_day_1))
+        Ok(RuleDay::Julian1WithoutLeap(julian_day_1))
     }
 
     /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
@@ -371,16 +375,16 @@ impl RuleDay {
             return Err(Error::TransitionRule("invalid rule day julian day"));
         }
 
-        Ok(Self::Julian0WithLeap(julian_day_0))
+        Ok(RuleDay::Julian0WithLeap(julian_day_0))
     }
 
     /// Construct a transition rule day represented by a month, a month week and a week day
     fn month_weekday(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
-        if !(1..=12).contains(&month) {
+        if month < 1 || month > 12 {
             return Err(Error::TransitionRule("invalid rule day month"));
         }
 
-        if !(1..=5).contains(&week) {
+        if week < 1 || week > 5 {
             return Err(Error::TransitionRule("invalid rule day week"));
         }
 
@@ -388,7 +392,7 @@ impl RuleDay {
             return Err(Error::TransitionRule("invalid rule day week day"));
         }
 
-        Ok(Self::MonthWeekday { month, week, week_day })
+        Ok(RuleDay::MonthWeekday { month, week, week_day })
     }
 
     /// Get the transition date for the provided year
@@ -399,7 +403,7 @@ impl RuleDay {
     /// * `month_day`: Day of the month in `[1, 31]`
     fn transition_date(&self, year: i32) -> (usize, i64) {
         match *self {
-            Self::Julian1WithoutLeap(year_day) => {
+            RuleDay::Julian1WithoutLeap(year_day) => {
                 let year_day = year_day as i64;
 
                 let month = match CUMUL_DAY_IN_MONTHS_NORMAL_YEAR.binary_search(&(year_day - 1)) {
@@ -411,7 +415,7 @@ impl RuleDay {
 
                 (month, month_day)
             }
-            Self::Julian0WithLeap(year_day) => {
+            RuleDay::Julian0WithLeap(year_day) => {
                 let leap = is_leap_year(year) as i64;
 
                 let cumul_day_in_months = [
@@ -440,7 +444,7 @@ impl RuleDay {
 
                 (month, month_day)
             }
-            Self::MonthWeekday { month: rule_month, week, week_day } => {
+            RuleDay::MonthWeekday { month: rule_month, week, week_day } => {
                 let leap = is_leap_year(year) as i64;
 
                 let month = rule_month as usize;
@@ -451,9 +455,9 @@ impl RuleDay {
                 }
 
                 let week_day_of_first_month_day =
-                    (4 + days_since_unix_epoch(year, month, 1)).rem_euclid(DAYS_PER_WEEK);
+                    rem_euclid(4 + days_since_unix_epoch(year, month, 1), DAYS_PER_WEEK);
                 let first_week_day_occurence_in_month =
-                    1 + (week_day as i64 - week_day_of_first_month_day).rem_euclid(DAYS_PER_WEEK);
+                    1 + rem_euclid(week_day as i64 - week_day_of_first_month_day, DAYS_PER_WEEK);
 
                 let mut month_day =
                     first_week_day_occurence_in_month + (week as i64 - 1) * DAYS_PER_WEEK;
@@ -477,7 +481,7 @@ impl RuleDay {
 mod tests {
     use super::{AlternateTime, LocalTimeType, RuleDay, TransitionRule};
     use crate::timezone::Transition;
-    use crate::{Error, TimeZone};
+    use crate::{matches, Error, TimeZone};
 
     #[test]
     fn test_quoted() -> Result<(), Error> {

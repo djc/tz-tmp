@@ -1,13 +1,12 @@
 //! Types related to a date time.
 
 use std::cmp::Ordering;
-use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::time::SystemTime;
 
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::{
-    Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    rem_euclid, Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
     HOURS_PER_DAY, SECONDS_PER_DAY, SECONDS_PER_HOUR,
 };
 
@@ -92,7 +91,13 @@ impl DateTime {
     /// Returns the current date time associated to the specified time zone
     pub fn now(time_zone_ref: TimeZoneRef) -> Result<Self, Error> {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos(), time_zone_ref)
+        let seconds = now.as_secs();
+        let seconds = match seconds <= i64::max_value() as u64 {
+            true => seconds as i64,
+            false => return Err(Error::OutOfRange("u64 out of range for i64")),
+        };
+
+        Self::from_timespec(seconds, now.subsec_nanos(), time_zone_ref)
     }
 
     /// Project the date time into another time zone.
@@ -138,12 +143,12 @@ impl DateTime {
     }
 
     /// Returns days since Sunday in `[0, 6]`
-    pub const fn week_day(&self) -> u8 {
+    pub fn week_day(&self) -> u8 {
         week_day(self.year, self.month as usize, self.month_day as i64)
     }
 
     /// Returns days since January 1 in `[0, 365]`
-    pub const fn year_day(&self) -> u16 {
+    pub fn year_day(&self) -> u16 {
         year_day(self.year, self.month as usize, self.month_day as i64)
     }
 
@@ -232,7 +237,7 @@ impl UtcDateTime {
         nanoseconds: u32,
     ) -> Result<Self, Error> {
         // Exclude the maximum possible UTC date time with a leap second
-        if year == i32::MAX
+        if year == i32::max_value()
             && month == 12
             && month_day == 31
             && hour == 23
@@ -242,10 +247,10 @@ impl UtcDateTime {
             return Err(Error::DateTime("out of range date time"));
         }
 
-        if !(1..=12).contains(&month) {
+        if month < 1 || month > 12 {
             return Err(Error::DateTime("invalid month"));
         }
-        if !(1..=31).contains(&month_day) {
+        if month_day < 1 || month_day > 31 {
             return Err(Error::DateTime("invalid month day"));
         }
         if hour > 23 {
@@ -334,9 +339,9 @@ impl UtcDateTime {
         let minute = (remaining_seconds / SECONDS_PER_MINUTE) % MINUTES_PER_HOUR;
         let second = remaining_seconds % SECONDS_PER_MINUTE;
 
-        let year = match i32::try_from(year) {
-            Ok(year) => year,
-            Err(_) => return Err(Error::OutOfRange("i64 is out of range for i32")),
+        let year = match year >= i32::min_value() as i64 && year <= i32::max_value() as i64 {
+            true => year as i32,
+            false => return Err(Error::OutOfRange("i64 is out of range for i32")),
         };
 
         Ok(Self {
@@ -353,7 +358,14 @@ impl UtcDateTime {
     /// Returns the current UTC date time
     pub fn now() -> Result<Self, Error> {
         let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-        Self::from_timespec(now.as_secs().try_into()?, now.subsec_nanos())
+
+        let seconds = now.as_secs();
+        let seconds = match seconds <= i64::max_value() as u64 {
+            true => seconds as i64,
+            false => return Err(Error::OutOfRange("u64 out of range for i64")),
+        };
+
+        Self::from_timespec(seconds, now.subsec_nanos())
     }
 
     /// Returns the Unix time in seconds associated to the UTC date time
@@ -451,9 +463,9 @@ impl fmt::Display for UtcDateTime {
 /// * `year`: Year
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
-const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
+fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
     let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
-    (4 + days_since_unix_epoch).rem_euclid(DAYS_PER_WEEK) as u8
+    rem_euclid(4 + days_since_unix_epoch, DAYS_PER_WEEK) as u8
 }
 
 /// Compute the number of days since January 1 in `[0, 365]`
@@ -463,13 +475,13 @@ const fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
 /// * `year`: Year
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
-const fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
+fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
     let leap = (month >= 3 && is_leap_year(year)) as i64;
     (CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1] + leap + month_day - 1) as u16
 }
 
 /// Check if a year is a leap year
-pub(crate) const fn is_leap_year(year: i32) -> bool {
+pub(crate) fn is_leap_year(year: i32) -> bool {
     year % 400 == 0 || (year % 4 == 0 && year % 100 != 0)
 }
 
@@ -480,7 +492,7 @@ pub(crate) const fn is_leap_year(year: i32) -> bool {
 /// * `year`: Year
 /// * `month`: Month in `[1, 12]`
 /// * `month_day`: Day of the month in `[1, 31]`
-pub(crate) const fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
+pub(crate) fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> i64 {
     let is_leap_year = is_leap_year(year);
 
     let year = year as i64;
@@ -523,15 +535,40 @@ fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
 /// * `unix_time`: Unix time in seconds
 /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
 fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), Error> {
-    let unix_time =
-        match i64::try_from(total_nanoseconds.div_euclid(NANOSECONDS_PER_SECOND as i128)) {
-            Ok(unix_time) => unix_time,
-            Err(_) => return Err(Error::OutOfRange("cannot convert i128 to i64")),
-        };
+    let seconds = div_euclid(total_nanoseconds, NANOSECONDS_PER_SECOND as i128);
+    let unix_time = match seconds >= i64::min_value() as i128 && seconds <= i64::max_value() as i128
+    {
+        true => seconds as i64,
+        false => return Err(Error::OutOfRange("cannot convert i128 to i64")),
+    };
 
-    let nanoseconds = total_nanoseconds.rem_euclid(NANOSECONDS_PER_SECOND as i128) as u32;
-
+    let nanoseconds = rem_euclid_i128(total_nanoseconds, NANOSECONDS_PER_SECOND as i128) as u32;
     Ok((unix_time, nanoseconds))
+}
+
+// MSRV: 1.38
+#[inline]
+fn div_euclid(v: i128, rhs: i128) -> i128 {
+    let q = v / rhs;
+    if v % rhs < 0 {
+        return if rhs > 0 { q - 1 } else { q + 1 };
+    }
+    q
+}
+
+// MSRV: 1.38
+#[inline]
+fn rem_euclid_i128(v: i128, rhs: i128) -> i128 {
+    let r = v % rhs;
+    if r < 0 {
+        if rhs < 0 {
+            r - rhs
+        } else {
+            r + rhs
+        }
+    } else {
+        r
+    }
 }
 
 /// Format a date time
@@ -617,7 +654,7 @@ mod test {
         total_nanoseconds_to_timespec, week_day, year_day, DateTime, UtcDateTime,
     };
     use crate::timezone::{LocalTimeType, TimeZone};
-    use crate::Error;
+    use crate::{matches, Error};
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year(), y.year());
@@ -1001,7 +1038,7 @@ mod test {
         let max_unix_time = 67767976233532799;
 
         assert!(matches!(
-            UtcDateTime::new(i32::MAX, 12, 31, 23, 59, 60, 0),
+            UtcDateTime::new(i32::max_value(), 12, 31, 23, 59, 60, 0),
             Err(Error::DateTime(_))
         ));
 
@@ -1029,15 +1066,21 @@ mod test {
             Err(Error::ProjectDateTime(_))
         ));
 
-        assert!(matches!(UtcDateTime::from_timespec(i64::MIN, 0), Err(Error::OutOfRange(_))));
-        assert!(matches!(UtcDateTime::from_timespec(i64::MAX, 0), Err(Error::OutOfRange(_))));
+        assert!(matches!(
+            UtcDateTime::from_timespec(i64::min_value(), 0),
+            Err(Error::OutOfRange(_))
+        ));
+        assert!(matches!(
+            UtcDateTime::from_timespec(i64::max_value(), 0),
+            Err(Error::OutOfRange(_))
+        ));
 
         assert!(matches!(
-            DateTime::from_timespec(i64::MIN, 0, TimeZone::fixed(-1)?.as_ref()),
+            DateTime::from_timespec(i64::min_value(), 0, TimeZone::fixed(-1)?.as_ref()),
             Err(Error::ProjectDateTime(_))
         ));
         assert!(matches!(
-            DateTime::from_timespec(i64::MAX, 0, TimeZone::fixed(1)?.as_ref()),
+            DateTime::from_timespec(i64::max_value(), 0, TimeZone::fixed(1)?.as_ref()),
             Err(Error::ProjectDateTime(_))
         ));
 
@@ -1116,16 +1159,24 @@ mod test {
         assert!(matches!(total_nanoseconds_to_timespec(-999_999_000), Ok((-1, 1000))));
         assert!(matches!(total_nanoseconds_to_timespec(-1_999_999_000), Ok((-2, 1000))));
 
-        assert!(matches!(total_nanoseconds_to_timespec(i128::MAX), Err(Error::OutOfRange(_))));
-        assert!(matches!(total_nanoseconds_to_timespec(i128::MIN), Err(Error::OutOfRange(_))));
+        assert!(matches!(
+            total_nanoseconds_to_timespec(i128::max_value()),
+            Err(Error::OutOfRange(_))
+        ));
+        assert!(matches!(
+            total_nanoseconds_to_timespec(i128::min_value()),
+            Err(Error::OutOfRange(_))
+        ));
 
         let min_total_nanoseconds = -9223372036854775808000000000;
         let max_total_nanoseconds = 9223372036854775807999999999;
 
-        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds), Ok((i64::MIN, 0))));
+        const MIN: i64 = i64::min_value();
+        const MAX: i64 = i64::max_value();
+        assert!(matches!(total_nanoseconds_to_timespec(min_total_nanoseconds), Ok((MIN, 0))));
         assert!(matches!(
             total_nanoseconds_to_timespec(max_total_nanoseconds),
-            Ok((i64::MAX, 999999999))
+            Ok((MAX, 999999999))
         ));
 
         assert!(matches!(

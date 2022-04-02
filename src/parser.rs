@@ -1,4 +1,3 @@
-use std::convert::TryInto;
 use std::io::{self, ErrorKind};
 use std::iter;
 use std::num::ParseIntError;
@@ -8,6 +7,7 @@ use crate::rule::TransitionRule;
 use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition};
 use crate::Error;
 
+#[allow(clippy::map_clone)] // MSRV: 1.36
 pub(super) fn parse(bytes: &[u8]) -> Result<TimeZone, Error> {
     let mut cursor = Cursor::new(bytes);
     let state = State::new(&mut cursor, true)?;
@@ -36,7 +36,7 @@ pub(super) fn parse(bytes: &[u8]) -> Result<TimeZone, Error> {
 
     let mut local_time_types = Vec::with_capacity(state.header.type_count);
     for arr in state.local_time_types.chunks_exact(6) {
-        let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
+        let ut_offset = read_be_i32(&arr[..4])?;
 
         let is_dst = match arr[4] {
             0 => false,
@@ -72,18 +72,16 @@ pub(super) fn parse(bytes: &[u8]) -> Result<TimeZone, Error> {
     let mut leap_seconds = Vec::with_capacity(state.header.leap_count);
     for arr in state.leap_seconds.chunks_exact(state.time_size + 4) {
         let unix_leap_time = state.parse_time(&arr[0..state.time_size], state.header.version)?;
-        let correction = i32::from_be_bytes(arr[state.time_size..state.time_size + 4].try_into()?);
+        let correction = read_be_i32(&arr[state.time_size..state.time_size + 4])?;
         leap_seconds.push(LeapSecond::new(unix_leap_time, correction));
     }
 
-    let std_walls_iter = state.std_walls.iter().copied().chain(iter::repeat(0));
-    let ut_locals_iter = state.ut_locals.iter().copied().chain(iter::repeat(0));
-    for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(state.header.type_count) {
-        if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
-            return Err(Error::InvalidTzFile(
-                "invalid couple of standard/wall and UT/local indicators",
-            ));
-        }
+    let std_walls_iter = state.std_walls.iter().map(|&i| i).chain(iter::repeat(0));
+    let ut_locals_iter = state.ut_locals.iter().map(|&i| i).chain(iter::repeat(0));
+    if std_walls_iter.zip(ut_locals_iter).take(state.header.type_count).any(|pair| pair == (0, 1)) {
+        return Err(Error::InvalidTzFile(
+            "invalid couple of standard/wall and UT/local indicators",
+        ));
     }
 
     let extra_rule = match footer {
@@ -157,10 +155,10 @@ impl<'a> State<'a> {
 
     /// Parse time values
     fn parse_time(&self, arr: &[u8], version: Version) -> Result<i64, Error> {
-        Ok(match version {
-            Version::V1 => i32::from_be_bytes(arr.try_into()?).into(),
-            Version::V2 | Version::V3 => i64::from_be_bytes(arr.try_into()?),
-        })
+        match version {
+            Version::V1 => Ok(read_be_i32(&arr[..4])?.into()),
+            Version::V2 | Version::V3 => read_be_i64(arr),
+        }
     }
 }
 
@@ -255,7 +253,9 @@ impl<'a> Cursor<'a> {
     }
 
     pub(crate) fn read_be_u32(&mut self) -> Result<u32, Error> {
-        Ok(u32::from_be_bytes(self.read_exact(4)?.try_into()?))
+        let mut buf = [0; 4];
+        buf.copy_from_slice(self.read_exact(4)?);
+        Ok(u32::from_be_bytes(buf))
     }
 
     /// Read exactly `count` bytes, reducing remaining data and incrementing read count
@@ -310,6 +310,26 @@ impl<'a> Cursor<'a> {
             Some(position) => self.read_exact(position),
         }
     }
+}
+
+pub(crate) fn read_be_i32(bytes: &[u8]) -> Result<i32, Error> {
+    if bytes.len() != 4 {
+        return Err(Error::InvalidSlice("too short for i32"));
+    }
+
+    let mut buf = [0; 4];
+    buf.copy_from_slice(bytes);
+    Ok(i32::from_be_bytes(buf))
+}
+
+pub(crate) fn read_be_i64(bytes: &[u8]) -> Result<i64, Error> {
+    if bytes.len() != 8 {
+        return Err(Error::InvalidSlice("too short for i64"));
+    }
+
+    let mut buf = [0; 8];
+    buf.copy_from_slice(bytes);
+    Ok(i64::from_be_bytes(buf))
 }
 
 /// TZif version
