@@ -312,11 +312,18 @@ fn parse_signed_hhmmss(cursor: &mut Cursor) -> Result<(i32, i32, i32, i32), Erro
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum RuleDay {
     /// Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
-    Julian1WithoutLeap(Julian1WithoutLeap),
+    Julian1WithoutLeap(u16),
     /// Zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
-    Julian0WithLeap(Julian0WithLeap),
+    Julian0WithLeap(u16),
     /// Day represented by a month, a month week and a week day
-    MonthWeekDay(MonthWeekDay),
+    MonthWeekDay {
+        /// Month in `[1, 12]`
+        month: u8,
+        /// Week of the month in `[1, 5]`, with `5` representing the last week of the month
+        week: u8,
+        /// Day of the week in `[0, 6]` from Sunday
+        week_day: u8,
+    },
 }
 
 impl RuleDay {
@@ -330,13 +337,13 @@ impl RuleDay {
                 let week = cursor.read_int()?;
                 cursor.read_tag(b".")?;
                 let week_day = cursor.read_int()?;
-                MonthWeekDay::new(month, week, week_day)?.into()
+                RuleDay::month_week_day(month, week, week_day)?
             }
             Some(b'J') => {
                 cursor.read_exact(1)?;
-                Julian1WithoutLeap::new(cursor.read_int()?)?.into()
+                RuleDay::julian_1(cursor.read_int()?)?
             }
-            _ => Julian0WithLeap::new(cursor.read_int()?)?.into(),
+            _ => RuleDay::julian_0(cursor.read_int()?)?,
         };
 
         Ok((
@@ -349,6 +356,41 @@ impl RuleDay {
         ))
     }
 
+    /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
+    fn julian_1(julian_day_1: u16) -> Result<Self, Error> {
+        if !(1..=365).contains(&julian_day_1) {
+            return Err(Error::TransitionRule("invalid rule day julian day"));
+        }
+
+        Ok(Self::Julian1WithoutLeap(julian_day_1))
+    }
+
+    /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
+    fn julian_0(julian_day_0: u16) -> Result<Self, Error> {
+        if julian_day_0 > 365 {
+            return Err(Error::TransitionRule("invalid rule day julian day"));
+        }
+
+        Ok(Self::Julian0WithLeap(julian_day_0))
+    }
+
+    /// Construct a transition rule day represented by a month, a month week and a week day
+    fn month_week_day(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
+        if !(1..=12).contains(&month) {
+            return Err(Error::TransitionRule("invalid rule day month"));
+        }
+
+        if !(1..=5).contains(&week) {
+            return Err(Error::TransitionRule("invalid rule day week"));
+        }
+
+        if week_day > 6 {
+            return Err(Error::TransitionRule("invalid rule day week day"));
+        }
+
+        Ok(Self::MonthWeekDay { month, week, week_day })
+    }
+
     /// Get the transition date for the provided year
     ///
     /// ## Outputs
@@ -357,7 +399,7 @@ impl RuleDay {
     /// * `month_day`: Day of the month in `[1, 31]`
     fn transition_date(&self, year: i32) -> (usize, i64) {
         match *self {
-            Self::Julian1WithoutLeap(Julian1WithoutLeap(year_day)) => {
+            Self::Julian1WithoutLeap(year_day) => {
                 let year_day = year_day as i64;
 
                 let month = match CUMUL_DAY_IN_MONTHS_NORMAL_YEAR.binary_search(&(year_day - 1)) {
@@ -369,7 +411,7 @@ impl RuleDay {
 
                 (month, month_day)
             }
-            Self::Julian0WithLeap(Julian0WithLeap(year_day)) => {
+            Self::Julian0WithLeap(year_day) => {
                 let leap = is_leap_year(year) as i64;
 
                 let cumul_day_in_months = [
@@ -398,7 +440,7 @@ impl RuleDay {
 
                 (month, month_day)
             }
-            Self::MonthWeekDay(MonthWeekDay { month: rule_month, week, week_day }) => {
+            Self::MonthWeekDay { month: rule_month, week, week_day } => {
                 let leap = is_leap_year(year) as i64;
 
                 let month = rule_month as usize;
@@ -431,90 +473,10 @@ impl RuleDay {
     }
 }
 
-impl From<Julian0WithLeap> for RuleDay {
-    fn from(inner: Julian0WithLeap) -> Self {
-        Self::Julian0WithLeap(inner)
-    }
-}
-
-impl From<Julian1WithoutLeap> for RuleDay {
-    fn from(inner: Julian1WithoutLeap) -> Self {
-        Self::Julian1WithoutLeap(inner)
-    }
-}
-
-impl From<MonthWeekDay> for RuleDay {
-    fn from(inner: MonthWeekDay) -> Self {
-        Self::MonthWeekDay(inner)
-    }
-}
-/// Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-struct Julian1WithoutLeap(u16);
-
-impl Julian1WithoutLeap {
-    /// Construct a transition rule day represented by a Julian day in `[1, 365]`, without taking occasional Feb 29 into account, which is not referenceable
-    fn new(julian_day_1: u16) -> Result<Self, Error> {
-        if !(1..=365).contains(&julian_day_1) {
-            return Err(Error::TransitionRule("invalid rule day julian day"));
-        }
-
-        Ok(Self(julian_day_1))
-    }
-}
-
-/// Zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-struct Julian0WithLeap(u16);
-
-impl Julian0WithLeap {
-    /// Construct a transition rule day represented by a zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
-    fn new(julian_day_0: u16) -> Result<Self, Error> {
-        if julian_day_0 > 365 {
-            return Err(Error::TransitionRule("invalid rule day julian day"));
-        }
-
-        Ok(Self(julian_day_0))
-    }
-}
-
-/// Day represented by a month, a month week and a week day
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-struct MonthWeekDay {
-    /// Month in `[1, 12]`
-    month: u8,
-    /// Week of the month in `[1, 5]`, with `5` representing the last week of the month
-    week: u8,
-    /// Day of the week in `[0, 6]` from Sunday
-    week_day: u8,
-}
-
-impl MonthWeekDay {
-    /// Construct a transition rule day represented by a month, a month week and a week day
-    fn new(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
-        if !(1..=12).contains(&month) {
-            return Err(Error::TransitionRule("invalid rule day month"));
-        }
-
-        if !(1..=5).contains(&week) {
-            return Err(Error::TransitionRule("invalid rule day week"));
-        }
-
-        if week_day > 6 {
-            return Err(Error::TransitionRule("invalid rule day week day"));
-        }
-
-        Ok(Self { month, week, week_day })
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::Transition;
-    use super::{
-        AlternateTime, Julian0WithLeap, Julian1WithoutLeap, LocalTimeType, MonthWeekDay, RuleDay,
-        TransitionRule,
-    };
+    use super::{AlternateTime, LocalTimeType, RuleDay, TransitionRule};
     use crate::{Error, TimeZone};
 
     #[test]
@@ -525,9 +487,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(-10800, false, Some(b"-03"))?,
                 LocalTimeType::new(10800, true, Some(b"+03"))?,
-                RuleDay::from(Julian1WithoutLeap::new(1)?),
+                RuleDay::julian_1(1)?,
                 7200,
-                RuleDay::from(Julian1WithoutLeap::new(365)?),
+                RuleDay::julian_1(365)?,
                 7200,
             )?
             .into()
@@ -544,9 +506,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(43200, false, Some(b"NZST"))?,
                 LocalTimeType::new(46800, true, Some(b"NZDT"))?,
-                RuleDay::from(MonthWeekDay::new(10, 1, 0)?),
+                RuleDay::month_week_day(10, 1, 0)?,
                 7200,
-                RuleDay::from(MonthWeekDay::new(3, 3, 0)?),
+                RuleDay::month_week_day(3, 3, 0)?,
                 7200,
             )?
             .into()
@@ -563,9 +525,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(3600, false, Some(b"IST"))?,
                 LocalTimeType::new(0, true, Some(b"GMT"))?,
-                RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+                RuleDay::month_week_day(10, 5, 0)?,
                 7200,
-                RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
+                RuleDay::month_week_day(3, 5, 0)?,
                 3600,
             )?
             .into()
@@ -583,9 +545,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(-10800, false, Some(b"-03"))?,
                 LocalTimeType::new(-7200, true, Some(b"-02"))?,
-                RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
+                RuleDay::month_week_day(3, 5, 0)?,
                 -7200,
-                RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+                RuleDay::month_week_day(10, 5, 0)?,
                 -3600,
             )?
             .into()
@@ -603,9 +565,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(-18000, false, Some(b"EST"))?,
                 LocalTimeType::new(-14400, true, Some(b"EDT"))?,
-                RuleDay::from(Julian0WithLeap::new(0)?),
+                RuleDay::julian_0(0)?,
                 0,
-                RuleDay::from(Julian1WithoutLeap::new(365)?),
+                RuleDay::julian_1(365)?,
                 90000,
             )?
             .into()
@@ -626,9 +588,9 @@ mod tests {
             Some(TransitionRule::from(AlternateTime::new(
                 LocalTimeType::new(7200, false, Some(b"IST"))?,
                 LocalTimeType::new(10800, true, Some(b"IDT"))?,
-                RuleDay::from(MonthWeekDay::new(3, 4, 4)?),
+                RuleDay::month_week_day(3, 4, 4)?,
                 93600,
-                RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+                RuleDay::month_week_day(10, 5, 0)?,
                 7200,
             )?)),
         )?;
@@ -640,17 +602,17 @@ mod tests {
 
     #[test]
     fn test_rule_day() -> Result<(), Error> {
-        let rule_day_j1 = RuleDay::from(Julian1WithoutLeap::new(60)?);
+        let rule_day_j1 = RuleDay::julian_1(60)?;
         assert_eq!(rule_day_j1.transition_date(2000), (3, 1));
         assert_eq!(rule_day_j1.transition_date(2001), (3, 1));
         assert_eq!(rule_day_j1.unix_time(2000, 43200), 951912000);
 
-        let rule_day_j0 = RuleDay::from(Julian0WithLeap::new(59)?);
+        let rule_day_j0 = RuleDay::julian_0(59)?;
         assert_eq!(rule_day_j0.transition_date(2000), (2, 29));
         assert_eq!(rule_day_j0.transition_date(2001), (3, 1));
         assert_eq!(rule_day_j0.unix_time(2000, 43200), 951825600);
 
-        let rule_day_mwd = RuleDay::from(MonthWeekDay::new(2, 5, 2)?);
+        let rule_day_mwd = RuleDay::month_week_day(2, 5, 2)?;
         assert_eq!(rule_day_mwd.transition_date(2000), (2, 29));
         assert_eq!(rule_day_mwd.transition_date(2001), (2, 27));
         assert_eq!(rule_day_mwd.unix_time(2000, 43200), 951825600);
@@ -667,9 +629,9 @@ mod tests {
         let transition_rule_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(43200, false, Some(b"NZST"))?,
             LocalTimeType::new(46800, true, Some(b"NZDT"))?,
-            RuleDay::from(MonthWeekDay::new(10, 1, 0)?),
+            RuleDay::month_week_day(10, 1, 0)?,
             7200,
-            RuleDay::from(MonthWeekDay::new(3, 3, 0)?),
+            RuleDay::month_week_day(3, 3, 0)?,
             7200,
         )?);
 
@@ -681,9 +643,9 @@ mod tests {
         let transition_rule_negative_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(3600, false, Some(b"IST"))?,
             LocalTimeType::new(0, true, Some(b"GMT"))?,
-            RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+            RuleDay::month_week_day(10, 5, 0)?,
             7200,
-            RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
+            RuleDay::month_week_day(3, 5, 0)?,
             3600,
         )?);
 
@@ -695,9 +657,9 @@ mod tests {
         let transition_rule_negative_time_1 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(0, false, None)?,
             LocalTimeType::new(0, true, None)?,
-            RuleDay::from(Julian0WithLeap::new(100)?),
+            RuleDay::julian_0(100)?,
             0,
-            RuleDay::from(Julian0WithLeap::new(101)?),
+            RuleDay::julian_0(101)?,
             -86500,
         )?);
 
@@ -709,9 +671,9 @@ mod tests {
         let transition_rule_negative_time_2 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-10800, false, Some(b"-03"))?,
             LocalTimeType::new(-7200, true, Some(b"-02"))?,
-            RuleDay::from(MonthWeekDay::new(3, 5, 0)?),
+            RuleDay::month_week_day(3, 5, 0)?,
             -7200,
-            RuleDay::from(MonthWeekDay::new(10, 5, 0)?),
+            RuleDay::month_week_day(10, 5, 0)?,
             -3600,
         )?);
 
@@ -735,9 +697,9 @@ mod tests {
         let transition_rule_all_year_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-18000, false, Some(b"EST"))?,
             LocalTimeType::new(-14400, true, Some(b"EDT"))?,
-            RuleDay::from(Julian0WithLeap::new(0)?),
+            RuleDay::julian_0(0)?,
             0,
-            RuleDay::from(Julian1WithoutLeap::new(365)?),
+            RuleDay::julian_1(365)?,
             90000,
         )?);
 
@@ -758,18 +720,18 @@ mod tests {
         let transition_rule_1 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-1, false, None)?,
             LocalTimeType::new(-1, true, None)?,
-            RuleDay::from(Julian1WithoutLeap::new(365)?),
+            RuleDay::julian_1(365)?,
             0,
-            RuleDay::from(Julian1WithoutLeap::new(1)?),
+            RuleDay::julian_1(1)?,
             0,
         )?);
 
         let transition_rule_2 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(1, false, None)?,
             LocalTimeType::new(1, true, None)?,
-            RuleDay::from(Julian1WithoutLeap::new(365)?),
+            RuleDay::julian_1(365)?,
             0,
-            RuleDay::from(Julian1WithoutLeap::new(1)?),
+            RuleDay::julian_1(1)?,
             0,
         )?);
 
