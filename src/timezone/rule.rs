@@ -316,7 +316,7 @@ enum RuleDay {
     /// Zero-based Julian day in `[0, 365]`, taking occasional Feb 29 into account
     Julian0WithLeap(u16),
     /// Day represented by a month, a month week and a week day
-    MonthWeekDay {
+    MonthWeekday {
         /// Month in `[1, 12]`
         month: u8,
         /// Week of the month in `[1, 5]`, with `5` representing the last week of the month
@@ -337,7 +337,7 @@ impl RuleDay {
                 let week = cursor.read_int()?;
                 cursor.read_tag(b".")?;
                 let week_day = cursor.read_int()?;
-                RuleDay::month_week_day(month, week, week_day)?
+                RuleDay::month_weekday(month, week, week_day)?
             }
             Some(b'J') => {
                 cursor.read_exact(1)?;
@@ -375,7 +375,7 @@ impl RuleDay {
     }
 
     /// Construct a transition rule day represented by a month, a month week and a week day
-    fn month_week_day(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
+    fn month_weekday(month: u8, week: u8, week_day: u8) -> Result<Self, Error> {
         if !(1..=12).contains(&month) {
             return Err(Error::TransitionRule("invalid rule day month"));
         }
@@ -388,7 +388,7 @@ impl RuleDay {
             return Err(Error::TransitionRule("invalid rule day week day"));
         }
 
-        Ok(Self::MonthWeekDay { month, week, week_day })
+        Ok(Self::MonthWeekday { month, week, week_day })
     }
 
     /// Get the transition date for the provided year
@@ -440,7 +440,7 @@ impl RuleDay {
 
                 (month, month_day)
             }
-            Self::MonthWeekDay { month: rule_month, week, week_day } => {
+            Self::MonthWeekday { month: rule_month, week, week_day } => {
                 let leap = is_leap_year(year) as i64;
 
                 let month = rule_month as usize;
@@ -506,9 +506,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(43200, false, Some(b"NZST"))?,
                 LocalTimeType::new(46800, true, Some(b"NZDT"))?,
-                RuleDay::month_week_day(10, 1, 0)?,
+                RuleDay::month_weekday(10, 1, 0)?,
                 7200,
-                RuleDay::month_week_day(3, 3, 0)?,
+                RuleDay::month_weekday(3, 3, 0)?,
                 7200,
             )?
             .into()
@@ -525,9 +525,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(3600, false, Some(b"IST"))?,
                 LocalTimeType::new(0, true, Some(b"GMT"))?,
-                RuleDay::month_week_day(10, 5, 0)?,
+                RuleDay::month_weekday(10, 5, 0)?,
                 7200,
-                RuleDay::month_week_day(3, 5, 0)?,
+                RuleDay::month_weekday(3, 5, 0)?,
                 3600,
             )?
             .into()
@@ -545,9 +545,9 @@ mod tests {
             AlternateTime::new(
                 LocalTimeType::new(-10800, false, Some(b"-03"))?,
                 LocalTimeType::new(-7200, true, Some(b"-02"))?,
-                RuleDay::month_week_day(3, 5, 0)?,
+                RuleDay::month_weekday(3, 5, 0)?,
                 -7200,
-                RuleDay::month_week_day(10, 5, 0)?,
+                RuleDay::month_weekday(10, 5, 0)?,
                 -3600,
             )?
             .into()
@@ -588,9 +588,9 @@ mod tests {
             Some(TransitionRule::from(AlternateTime::new(
                 LocalTimeType::new(7200, false, Some(b"IST"))?,
                 LocalTimeType::new(10800, true, Some(b"IDT"))?,
-                RuleDay::month_week_day(3, 4, 4)?,
+                RuleDay::month_weekday(3, 4, 4)?,
                 93600,
-                RuleDay::month_week_day(10, 5, 0)?,
+                RuleDay::month_weekday(10, 5, 0)?,
                 7200,
             )?)),
         )?;
@@ -612,7 +612,7 @@ mod tests {
         assert_eq!(rule_day_j0.transition_date(2001), (3, 1));
         assert_eq!(rule_day_j0.unix_time(2000, 43200), 951825600);
 
-        let rule_day_mwd = RuleDay::month_week_day(2, 5, 2)?;
+        let rule_day_mwd = RuleDay::month_weekday(2, 5, 2)?;
         assert_eq!(rule_day_mwd.transition_date(2000), (2, 29));
         assert_eq!(rule_day_mwd.transition_date(2001), (2, 27));
         assert_eq!(rule_day_mwd.unix_time(2000, 43200), 951825600);
@@ -629,9 +629,9 @@ mod tests {
         let transition_rule_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(43200, false, Some(b"NZST"))?,
             LocalTimeType::new(46800, true, Some(b"NZDT"))?,
-            RuleDay::month_week_day(10, 1, 0)?,
+            RuleDay::month_weekday(10, 1, 0)?,
             7200,
-            RuleDay::month_week_day(3, 3, 0)?,
+            RuleDay::month_weekday(3, 3, 0)?,
             7200,
         )?);
 
@@ -643,9 +643,9 @@ mod tests {
         let transition_rule_negative_dst = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(3600, false, Some(b"IST"))?,
             LocalTimeType::new(0, true, Some(b"GMT"))?,
-            RuleDay::month_week_day(10, 5, 0)?,
+            RuleDay::month_weekday(10, 5, 0)?,
             7200,
-            RuleDay::month_week_day(3, 5, 0)?,
+            RuleDay::month_weekday(3, 5, 0)?,
             3600,
         )?);
 
@@ -671,9 +671,9 @@ mod tests {
         let transition_rule_negative_time_2 = TransitionRule::from(AlternateTime::new(
             LocalTimeType::new(-10800, false, Some(b"-03"))?,
             LocalTimeType::new(-7200, true, Some(b"-02"))?,
-            RuleDay::month_week_day(3, 5, 0)?,
+            RuleDay::month_weekday(3, 5, 0)?,
             -7200,
-            RuleDay::month_week_day(10, 5, 0)?,
+            RuleDay::month_weekday(10, 5, 0)?,
             -3600,
         )?);
 
