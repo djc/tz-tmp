@@ -46,7 +46,7 @@ impl DateTime {
             Err(err) => return Err(err),
         };
 
-        let unix_time_with_offset = match unix_time.checked_add(local_time_type.ut_offset() as i64)
+        let unix_time_with_offset = match unix_time.checked_add(local_time_type.offset() as i64)
         {
             Some(unix_time_with_offset) => unix_time_with_offset,
             None => return Err(Error::ProjectDateTime("out of range date time")),
@@ -191,7 +191,7 @@ impl fmt::Display for DateTime {
             self.minute,
             self.second,
             self.nanoseconds,
-            self.local_time_type().ut_offset(),
+            self.local_time_type().offset(),
         )
     }
 }
@@ -671,17 +671,17 @@ mod test {
     #[test]
     fn test_date_time() -> Result<(), Error> {
         let time_zone_utc = TimeZone::utc();
-        let utc = LocalTimeType::utc();
+        let utc = LocalTimeType::UTC;
 
         let time_zone_cet = TimeZone::fixed(3600)?;
-        let cet = LocalTimeType::with_ut_offset(3600)?;
+        let cet = LocalTimeType::with_offset(3600)?;
 
         let time_zone_eet = TimeZone::fixed(7200)?;
-        let eet = LocalTimeType::with_ut_offset(7200)?;
+        let eet = LocalTimeType::with_offset(7200)?;
 
-        assert_eq!(DateTime::now(time_zone_utc.as_ref())?.local_time_type().ut_offset(), 0);
-        assert_eq!(DateTime::now(time_zone_cet.as_ref())?.local_time_type().ut_offset(), 3600);
-        assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().ut_offset(), 7200);
+        assert_eq!(DateTime::now(time_zone_utc.as_ref())?.local_time_type().offset(), 0);
+        assert_eq!(DateTime::now(time_zone_cet.as_ref())?.local_time_type().offset(), 3600);
+        assert_eq!(DateTime::now(time_zone_eet.as_ref())?.local_time_type().offset(), 7200);
 
         let unix_times = &[
             -93750523200,
@@ -825,7 +825,7 @@ mod test {
             hour: 23,
             minute: 00,
             second: 00,
-            local_time_type: LocalTimeType::with_ut_offset(-3600)?,
+            local_time_type: LocalTimeType::with_offset(-3600)?,
             unix_time: 78796800,
             nanoseconds: 1000,
         };

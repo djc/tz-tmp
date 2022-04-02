@@ -16,11 +16,11 @@ fn main() -> Result<(), Error> {
 
     // Get fixed time zone at GMT-1
     let time_zone_fixed = TimeZone::fixed(-3600)?;
-    println!("{:?}", time_zone_fixed.find_local_time_type(unix_time)?.ut_offset());
+    println!("{:?}", time_zone_fixed.find_local_time_type(unix_time)?.offset());
 
     // Get local time zone (UNIX only)
     let time_zone_local = TimeZone::local()?;
-    println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.ut_offset());
+    println!("{:?}", time_zone_local.find_local_time_type(unix_time)?.offset());
 
     // Get the current local time type
     let unix_now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs();

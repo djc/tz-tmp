@@ -27,11 +27,11 @@
 //!
 //! // Get UTC time zone
 //! let time_zone_utc = TimeZone::utc();
-//! assert_eq!(time_zone_utc.find_local_time_type(unix_time)?.ut_offset(), 0);
+//! assert_eq!(time_zone_utc.find_local_time_type(unix_time)?.offset(), 0);
 //!
 //! // Get fixed time zone at GMT-1
 //! let time_zone_fixed = TimeZone::fixed(-3600)?;
-//! assert_eq!(time_zone_fixed.find_local_time_type(unix_time)?.ut_offset(), -3600);
+//! assert_eq!(time_zone_fixed.find_local_time_type(unix_time)?.offset(), -3600);
 //!
 //! // Get local time zone (UNIX only)
 //! let time_zone_local = TimeZone::local()?;
@@ -95,7 +95,7 @@
 //! assert_eq!(date_time.second(), 0);
 //! assert_eq!(date_time.week_day(), 5);
 //! assert_eq!(date_time.year_day(), 364);
-//! assert_eq!(date_time.local_time_type().ut_offset(), -3600);
+//! assert_eq!(date_time.local_time_type().offset(), -3600);
 //! assert_eq!(date_time.unix_time(), 946684800);
 //! assert_eq!(date_time.nanoseconds(), 123_456_789);
 //! assert_eq!(date_time.to_string(), "1999-12-31T23:00:00.123456789-01:00");
@@ -110,7 +110,7 @@
 //! assert_eq!(other_date_time.second(), 0);
 //! assert_eq!(other_date_time.week_day(), 6);
 //! assert_eq!(other_date_time.year_day(), 0);
-//! assert_eq!(other_date_time.local_time_type().ut_offset(), 3600);
+//! assert_eq!(other_date_time.local_time_type().offset(), 3600);
 //! assert_eq!(other_date_time.unix_time(), 946684800);
 //! assert_eq!(other_date_time.nanoseconds(), 123_456_789);
 //! assert_eq!(other_date_time.to_string(), "2000-01-01T01:00:00.123456789+01:00");

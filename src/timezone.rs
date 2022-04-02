@@ -100,7 +100,7 @@ impl TimeZone {
     pub fn fixed(ut_offset: i32) -> Result<Self, Error> {
         Ok(Self {
             transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType::with_ut_offset(ut_offset)?],
+            local_time_types: vec![LocalTimeType::with_offset(ut_offset)?],
             leap_seconds: Vec::new(),
             extra_rule: None,
         })
@@ -110,7 +110,7 @@ impl TimeZone {
     pub fn utc() -> Self {
         Self {
             transitions: Vec::new(),
-            local_time_types: vec![LocalTimeType::utc()],
+            local_time_types: vec![LocalTimeType::UTC],
             leap_seconds: Vec::new(),
             extra_rule: None,
         }
@@ -146,21 +146,6 @@ pub struct TimeZoneRef<'a> {
 }
 
 impl<'a> TimeZoneRef<'a> {
-    /// Returns list of transitions
-    pub fn transitions(&self) -> &'a [Transition] {
-        self.transitions
-    }
-
-    /// Returns list of local time types
-    pub fn local_time_types(&self) -> &'a [LocalTimeType] {
-        self.local_time_types
-    }
-
-    /// Returns list of leap seconds
-    pub fn leap_seconds(&self) -> &'a [LeapSecond] {
-        self.leap_seconds
-    }
-
     /// Find the local time type associated to the time zone at the specified Unix time in seconds
     pub fn find_local_time_type(&self, unix_time: i64) -> Result<&'a LocalTimeType, Error> {
         let extra_rule = match self.transitions.last() {
@@ -346,7 +331,7 @@ impl<'a> TimeZoneRef<'a> {
     /// The UTC time zone
     pub const UTC: TimeZoneRef<'static> = TimeZoneRef {
         transitions: &[],
-        local_time_types: &[UTC_TYPE],
+        local_time_types: &[LocalTimeType::UTC],
         leap_seconds: &[],
         extra_rule: &None,
     };
@@ -354,7 +339,7 @@ impl<'a> TimeZoneRef<'a> {
 
 /// Transition of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct Transition {
+pub(crate) struct Transition {
     /// Unix leap time
     unix_leap_time: i64,
     /// Index specifying the local time type of the transition
@@ -363,24 +348,19 @@ pub struct Transition {
 
 impl Transition {
     /// Construct a TZif file transition
-    pub fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
+    pub(crate) fn new(unix_leap_time: i64, local_time_type_index: usize) -> Self {
         Self { unix_leap_time, local_time_type_index }
     }
 
     /// Returns Unix leap time
-    pub fn unix_leap_time(&self) -> i64 {
+    fn unix_leap_time(&self) -> i64 {
         self.unix_leap_time
-    }
-
-    /// Returns local time type index
-    pub fn local_time_type_index(&self) -> usize {
-        self.local_time_type_index
     }
 }
 
 /// Leap second of a TZif file
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct LeapSecond {
+pub(crate) struct LeapSecond {
     /// Unix leap time
     unix_leap_time: i64,
     /// Leap second correction
@@ -389,18 +369,13 @@ pub struct LeapSecond {
 
 impl LeapSecond {
     /// Construct a TZif file leap second
-    pub fn new(unix_leap_time: i64, correction: i32) -> Self {
+    pub(crate) fn new(unix_leap_time: i64, correction: i32) -> Self {
         Self { unix_leap_time, correction }
     }
 
     /// Returns Unix leap time
-    pub fn unix_leap_time(&self) -> i64 {
+    fn unix_leap_time(&self) -> i64 {
         self.unix_leap_time
-    }
-
-    /// Returns leap second correction
-    pub fn correction(&self) -> i32 {
-        self.correction
     }
 }
 
@@ -497,13 +472,8 @@ impl LocalTimeType {
         Ok(Self { ut_offset, is_dst, name: Some(name) })
     }
 
-    /// Construct the local time type associated to UTC
-    pub const fn utc() -> Self {
-        Self { ut_offset: 0, is_dst: false, name: None }
-    }
-
     /// Construct a local time type with the specified UTC offset in seconds
-    pub fn with_ut_offset(ut_offset: i32) -> Result<Self, Error> {
+    pub fn with_offset(ut_offset: i32) -> Result<Self, Error> {
         if ut_offset == i32::min_value() {
             return Err(Error::LocalTimeType("invalid UTC offset"));
         }
@@ -512,7 +482,7 @@ impl LocalTimeType {
     }
 
     /// Returns offset from UTC in seconds
-    pub fn ut_offset(&self) -> i32 {
+    pub fn offset(&self) -> i32 {
         self.ut_offset
     }
 
@@ -525,6 +495,8 @@ impl LocalTimeType {
     pub fn name(&self) -> &str {
         self.name.as_ref().map(|name| name.as_ref()).unwrap_or("")
     }
+
+    pub const UTC: LocalTimeType = Self { ut_offset: 0, is_dst: false, name: None };
 }
 
 /// Open the TZif file corresponding to a TZ string
@@ -570,8 +542,6 @@ const ZONE_INFO_DIRECTORIES: [&str; 3] =
 pub(crate) const SECONDS_PER_WEEK: i64 = SECONDS_PER_DAY * DAYS_PER_WEEK;
 /// Number of seconds in 28 days
 const SECONDS_PER_28_DAYS: i64 = SECONDS_PER_DAY * 28;
-
-const UTC_TYPE: LocalTimeType = LocalTimeType::utc();
 
 #[cfg(test)]
 mod tests {
@@ -709,8 +679,8 @@ mod tests {
 
     #[test]
     fn test_time_zone() -> Result<(), Error> {
-        let utc = LocalTimeType::utc();
-        let cet = LocalTimeType::with_ut_offset(3600)?;
+        let utc = LocalTimeType::UTC;
+        let cet = LocalTimeType::with_offset(3600)?;
 
         let utc_local_time_types = vec![utc];
         let fixed_extra_rule = TransitionRule::from(cet);
@@ -761,7 +731,7 @@ mod tests {
             assert_eq!(time_zone_local, time_zone_local_3);
 
             let time_zone_utc = TimeZone::from_posix_tz("UTC")?;
-            assert_eq!(time_zone_utc.find_local_time_type(0)?.ut_offset(), 0);
+            assert_eq!(time_zone_utc.find_local_time_type(0)?.offset(), 0);
         }
 
         assert!(TimeZone::from_posix_tz("EST5EDT,0/0,J365/25").is_err());
@@ -825,15 +795,15 @@ mod tests {
     fn test_leap_seconds_overflow() -> Result<(), Error> {
         let time_zone_err = TimeZone::new(
             vec![Transition::new(i64::min_value(), 0)],
-            vec![LocalTimeType::utc()],
+            vec![LocalTimeType::UTC],
             vec![LeapSecond::new(0, 1)],
-            Some(TransitionRule::from(LocalTimeType::utc())),
+            Some(TransitionRule::from(LocalTimeType::UTC)),
         );
         assert!(time_zone_err.is_err());
 
         let time_zone = TimeZone::new(
             vec![Transition::new(i64::max_value(), 0)],
-            vec![LocalTimeType::utc()],
+            vec![LocalTimeType::UTC],
             vec![LeapSecond::new(0, 1)],
             None,
         )?;
