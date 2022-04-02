@@ -1,5 +1,5 @@
 use super::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzAsciiStr};
-use crate::error::Error;
+use crate::Error;
 
 #[test]
 fn test_no_dst() -> Result<(), Error> {

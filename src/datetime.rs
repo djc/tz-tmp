@@ -5,12 +5,11 @@ use std::convert::{TryFrom, TryInto};
 use std::fmt;
 use std::time::SystemTime;
 
-use super::{
-    CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR, HOURS_PER_DAY,
-    SECONDS_PER_DAY, SECONDS_PER_HOUR,
-};
-use crate::error::Error;
 use crate::timezone::{LocalTimeType, TimeZoneRef};
+use crate::{
+    Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    HOURS_PER_DAY, SECONDS_PER_DAY, SECONDS_PER_HOUR,
+};
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
 #[derive(Debug, Copy, Clone)]
@@ -617,8 +616,8 @@ mod test {
         days_since_unix_epoch, is_leap_year, nanoseconds_since_unix_epoch,
         total_nanoseconds_to_timespec, week_day, year_day, DateTime, UtcDateTime,
     };
-    use crate::error::Error;
     use crate::timezone::{LocalTimeType, TimeZone};
+    use crate::Error;
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year(), y.year());
