@@ -499,15 +499,12 @@ impl LocalTimeType {
             return Err(Error::LocalTimeType("invalid UTC offset"));
         }
 
-        let time_zone_designation = match time_zone_designation {
-            None => None,
-            Some(time_zone_designation) => match TzAsciiStr::new(time_zone_designation) {
-                Err(error) => return Err(error),
-                Ok(time_zone_designation) => Some(time_zone_designation),
-            },
+        let designation = match time_zone_designation {
+            Some(designation) => TzAsciiStr::new(designation)?,
+            None => return Ok(Self { ut_offset, is_dst, time_zone_designation: None }),
         };
 
-        Ok(Self { ut_offset, is_dst, time_zone_designation })
+        Ok(Self { ut_offset, is_dst, time_zone_designation: Some(designation) })
     }
 
     /// Construct the local time type associated to UTC
