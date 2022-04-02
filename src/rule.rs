@@ -28,14 +28,14 @@ impl TransitionRule {
     ) -> Result<Self, Error> {
         let mut cursor = Cursor::new(tz_string);
 
-        let std_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
+        let std_time_zone = Some(parse_name(&mut cursor)?);
         let std_offset = parse_offset(&mut cursor)?;
 
         if cursor.is_empty() {
             return Ok(LocalTimeType::new(-std_offset, false, std_time_zone)?.into());
         }
 
-        let dst_time_zone = Some(parse_time_zone_designation(&mut cursor)?);
+        let dst_time_zone = Some(parse_name(&mut cursor)?);
 
         let dst_offset = match cursor.peek() {
             Some(&b',') => std_offset - 3600,
@@ -214,8 +214,8 @@ impl AlternateTime {
     }
 }
 
-/// Parse time zone designation
-fn parse_time_zone_designation<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], Error> {
+/// Parse time zone name
+fn parse_name<'a>(cursor: &mut Cursor<'a>) -> Result<&'a [u8], Error> {
     match cursor.peek() {
         Some(b'<') => {}
         _ => return Ok(cursor.read_while(u8::is_ascii_alphabetic)?),

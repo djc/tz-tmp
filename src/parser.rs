@@ -46,27 +46,17 @@ pub(super) fn parse(bytes: &[u8]) -> Result<TimeZone, Error> {
 
         let char_index = arr[5] as usize;
         if char_index >= state.header.char_count {
-            return Err(Error::InvalidTzFile("invalid time zone designation char index"));
+            return Err(Error::InvalidTzFile("invalid time zone name char index"));
         }
 
-        let time_zone_designation = match state.time_zone_designations[char_index..]
-            .iter()
-            .position(|&c| c == b'\0')
-        {
-            None => return Err(Error::InvalidTzFile("invalid time zone designation char index")),
-            Some(position) => {
-                let time_zone_designation =
-                    &state.time_zone_designations[char_index..char_index + position];
-
-                if !time_zone_designation.is_empty() {
-                    Some(time_zone_designation)
-                } else {
-                    None
-                }
-            }
+        let position = match state.names[char_index..].iter().position(|&c| c == b'\0') {
+            Some(position) => position,
+            None => return Err(Error::InvalidTzFile("invalid time zone name char index")),
         };
 
-        local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
+        let name = &state.names[char_index..char_index + position];
+        let name = if !name.is_empty() { Some(name) } else { None };
+        local_time_types.push(LocalTimeType::new(ut_offset, is_dst, name)?);
     }
 
     let mut leap_seconds = Vec::with_capacity(state.header.leap_count);
@@ -121,8 +111,8 @@ struct State<'a> {
     transition_types: &'a [u8],
     /// Local time types data block
     local_time_types: &'a [u8],
-    /// Time zone designations data block
-    time_zone_designations: &'a [u8],
+    /// Time zone names data block
+    names: &'a [u8],
     /// Leap seconds data block
     leap_seconds: &'a [u8],
     /// UT/local indicators data block
@@ -145,7 +135,7 @@ impl<'a> State<'a> {
             transition_times: cursor.read_exact(header.transition_count * time_size)?,
             transition_types: cursor.read_exact(header.transition_count)?,
             local_time_types: cursor.read_exact(header.type_count * 6)?,
-            time_zone_designations: cursor.read_exact(header.char_count)?,
+            names: cursor.read_exact(header.char_count)?,
             leap_seconds: cursor.read_exact(header.leap_count * (time_size + 4))?,
             std_walls: cursor.read_exact(header.std_wall_count)?,
             ut_locals: cursor.read_exact(header.ut_local_count)?,
@@ -177,7 +167,7 @@ struct Header {
     transition_count: usize,
     /// Number of local time type records
     type_count: usize,
-    /// Number of time zone designations bytes
+    /// Number of time zone names bytes
     char_count: usize,
 }
 

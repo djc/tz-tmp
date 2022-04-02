@@ -283,10 +283,7 @@ impl<'a> TimeZoneRef<'a> {
 
             let check = last_local_time_type.ut_offset == rule_local_time_type.ut_offset
                 && last_local_time_type.is_dst == rule_local_time_type.is_dst
-                && match (
-                    &last_local_time_type.time_zone_designation,
-                    &rule_local_time_type.time_zone_designation,
-                ) {
+                && match (&last_local_time_type.name, &rule_local_time_type.name) {
                     (Some(x), Some(y)) => x.equal(y),
                     (None, None) => true,
                     _ => false,
@@ -408,21 +405,21 @@ impl LeapSecond {
     }
 }
 
-/// ASCII-encoded fixed-capacity string, used for storing time zone designations
+/// ASCII-encoded fixed-capacity string, used for storing time zone names
 #[derive(Copy, Clone, Eq, PartialEq)]
-struct TzAsciiStr {
+struct TimeZoneName {
     /// Length-prefixed string buffer
     bytes: [u8; 8],
 }
 
-impl TzAsciiStr {
-    /// Construct a time zone designation string
+impl TimeZoneName {
+    /// Construct a time zone name
     fn new(input: &[u8]) -> Result<Self, Error> {
         let len = input.len();
 
         if !(3 <= len && len <= 7) {
             return Err(Error::LocalTimeType(
-                "time zone designation must have between 3 and 7 characters",
+                "time zone name must have between 3 and 7 characters",
             ));
         }
 
@@ -434,9 +431,7 @@ impl TzAsciiStr {
             let b = input[i];
             match b {
                 b'0'..=b'9' | b'A'..=b'Z' | b'a'..=b'z' | b'+' | b'-' => {}
-                _ => {
-                    return Err(Error::LocalTimeType("invalid characters in time zone designation"))
-                }
+                _ => return Err(Error::LocalTimeType("invalid characters in time zone name")),
             }
 
             bytes[i + 1] = b;
@@ -446,7 +441,7 @@ impl TzAsciiStr {
         Ok(Self { bytes })
     }
 
-    /// Returns time zone designation as a byte slice
+    /// Returns time zone name as a byte slice
     fn as_bytes(&self) -> &[u8] {
         match self.bytes[0] {
             3 => &self.bytes[1..4],
@@ -458,21 +453,22 @@ impl TzAsciiStr {
         }
     }
 
-    /// Returns time zone designation as a string
-    fn as_str(&self) -> &str {
-        // SAFETY: ASCII is valid UTF-8
-        unsafe { str::from_utf8_unchecked(self.as_bytes()) }
-    }
-
-    /// Check if two time zone designations are equal
+    /// Check if two time zone names are equal
     fn equal(&self, other: &Self) -> bool {
         self.bytes == other.bytes
     }
 }
 
-impl fmt::Debug for TzAsciiStr {
+impl AsRef<str> for TimeZoneName {
+    fn as_ref(&self) -> &str {
+        // SAFETY: ASCII is valid UTF-8
+        unsafe { str::from_utf8_unchecked(self.as_bytes()) }
+    }
+}
+
+impl fmt::Debug for TimeZoneName {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.as_str().fmt(f)
+        self.as_ref().fmt(f)
     }
 }
 
@@ -483,32 +479,28 @@ pub struct LocalTimeType {
     pub(crate) ut_offset: i32,
     /// Daylight Saving Time indicator
     is_dst: bool,
-    /// Time zone designation
-    time_zone_designation: Option<TzAsciiStr>,
+    /// Time zone name
+    name: Option<TimeZoneName>,
 }
 
 impl LocalTimeType {
     /// Construct a local time type
-    pub(crate) fn new(
-        ut_offset: i32,
-        is_dst: bool,
-        time_zone_designation: Option<&[u8]>,
-    ) -> Result<Self, Error> {
+    pub(crate) fn new(ut_offset: i32, is_dst: bool, name: Option<&[u8]>) -> Result<Self, Error> {
         if ut_offset == i32::min_value() {
             return Err(Error::LocalTimeType("invalid UTC offset"));
         }
 
-        let designation = match time_zone_designation {
-            Some(designation) => TzAsciiStr::new(designation)?,
-            None => return Ok(Self { ut_offset, is_dst, time_zone_designation: None }),
+        let name = match name {
+            Some(name) => TimeZoneName::new(name)?,
+            None => return Ok(Self { ut_offset, is_dst, name: None }),
         };
 
-        Ok(Self { ut_offset, is_dst, time_zone_designation: Some(designation) })
+        Ok(Self { ut_offset, is_dst, name: Some(name) })
     }
 
     /// Construct the local time type associated to UTC
     pub const fn utc() -> Self {
-        Self { ut_offset: 0, is_dst: false, time_zone_designation: None }
+        Self { ut_offset: 0, is_dst: false, name: None }
     }
 
     /// Construct a local time type with the specified UTC offset in seconds
@@ -517,7 +509,7 @@ impl LocalTimeType {
             return Err(Error::LocalTimeType("invalid UTC offset"));
         }
 
-        Ok(Self { ut_offset, is_dst: false, time_zone_designation: None })
+        Ok(Self { ut_offset, is_dst: false, name: None })
     }
 
     /// Returns offset from UTC in seconds
@@ -530,12 +522,9 @@ impl LocalTimeType {
         self.is_dst
     }
 
-    /// Returns time zone designation
-    pub fn time_zone_designation(&self) -> &str {
-        match &self.time_zone_designation {
-            Some(s) => s.as_str(),
-            None => "",
-        }
+    /// Returns time zone name
+    pub fn name(&self) -> &str {
+        self.name.as_ref().map(|name| name.as_ref()).unwrap_or("")
     }
 }
 
@@ -587,7 +576,7 @@ const UTC_TYPE: LocalTimeType = LocalTimeType::utc();
 
 #[cfg(test)]
 mod tests {
-    use super::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule, TzAsciiStr};
+    use super::{LeapSecond, LocalTimeType, TimeZone, TimeZoneName, Transition, TransitionRule};
     use crate::{matches, Error};
 
     #[test]
@@ -702,19 +691,19 @@ mod tests {
 
     #[test]
     fn test_tz_ascii_str() -> Result<(), Error> {
-        assert!(matches!(TzAsciiStr::new(b""), Err(Error::LocalTimeType(_))));
-        assert!(matches!(TzAsciiStr::new(b"1"), Err(Error::LocalTimeType(_))));
-        assert!(matches!(TzAsciiStr::new(b"12"), Err(Error::LocalTimeType(_))));
-        assert_eq!(TzAsciiStr::new(b"123")?.as_bytes(), b"123");
-        assert_eq!(TzAsciiStr::new(b"1234")?.as_bytes(), b"1234");
-        assert_eq!(TzAsciiStr::new(b"12345")?.as_bytes(), b"12345");
-        assert_eq!(TzAsciiStr::new(b"123456")?.as_bytes(), b"123456");
-        assert_eq!(TzAsciiStr::new(b"1234567")?.as_bytes(), b"1234567");
-        assert!(matches!(TzAsciiStr::new(b"12345678"), Err(Error::LocalTimeType(_))));
-        assert!(matches!(TzAsciiStr::new(b"123456789"), Err(Error::LocalTimeType(_))));
-        assert!(matches!(TzAsciiStr::new(b"1234567890"), Err(Error::LocalTimeType(_))));
+        assert!(matches!(TimeZoneName::new(b""), Err(Error::LocalTimeType(_))));
+        assert!(matches!(TimeZoneName::new(b"1"), Err(Error::LocalTimeType(_))));
+        assert!(matches!(TimeZoneName::new(b"12"), Err(Error::LocalTimeType(_))));
+        assert_eq!(TimeZoneName::new(b"123")?.as_bytes(), b"123");
+        assert_eq!(TimeZoneName::new(b"1234")?.as_bytes(), b"1234");
+        assert_eq!(TimeZoneName::new(b"12345")?.as_bytes(), b"12345");
+        assert_eq!(TimeZoneName::new(b"123456")?.as_bytes(), b"123456");
+        assert_eq!(TimeZoneName::new(b"1234567")?.as_bytes(), b"1234567");
+        assert!(matches!(TimeZoneName::new(b"12345678"), Err(Error::LocalTimeType(_))));
+        assert!(matches!(TimeZoneName::new(b"123456789"), Err(Error::LocalTimeType(_))));
+        assert!(matches!(TimeZoneName::new(b"1234567890"), Err(Error::LocalTimeType(_))));
 
-        assert!(matches!(TzAsciiStr::new(b"123\0\0\0"), Err(Error::LocalTimeType(_))));
+        assert!(matches!(TimeZoneName::new(b"123\0\0\0"), Err(Error::LocalTimeType(_))));
 
         Ok(())
     }
