@@ -83,7 +83,7 @@ impl TimeZone {
         extra_rule: Option<TransitionRule>,
     ) -> Result<Self, Error> {
         let new = Self { transitions, local_time_types, leap_seconds, extra_rule };
-        new.as_ref().check_inputs()?;
+        new.as_ref().validate()?;
         Ok(new)
     }
 
@@ -226,7 +226,7 @@ impl<'a> TimeZoneRef<'a> {
     }
 
     /// Check time zone inputs
-    fn check_inputs(&self) -> Result<(), Error> {
+    fn validate(&self) -> Result<(), Error> {
         // Check local time types
         let local_time_types_size = self.local_time_types.len();
         if local_time_types_size == 0 {
