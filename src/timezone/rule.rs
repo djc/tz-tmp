@@ -1,9 +1,10 @@
 use std::cmp::Ordering;
 
+use super::parser::Cursor;
 use super::{LocalTimeType, SECONDS_PER_WEEK};
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
 use crate::{
-    Cursor, Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
+    Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
     SECONDS_PER_DAY,
 };
 
