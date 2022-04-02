@@ -417,7 +417,7 @@ impl TimeZoneName {
     fn new(input: &[u8]) -> Result<Self, Error> {
         let len = input.len();
 
-        if !(3 <= len && len <= 7) {
+        if len < 3 || len > 7 {
             return Err(Error::LocalTimeType(
                 "time zone name must have between 3 and 7 characters",
             ));
