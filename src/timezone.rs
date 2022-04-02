@@ -263,37 +263,36 @@ impl<'a> TimeZoneRef<'a> {
         }
 
         // Check extra rule
-        if let (Some(extra_rule), Some(last_transition)) =
-            (&self.extra_rule, self.transitions.last())
-        {
-            let last_local_time_type =
-                &self.local_time_types[last_transition.local_time_type_index];
+        let (extra_rule, last_transition) = match (&self.extra_rule, self.transitions.last()) {
+            (Some(rule), Some(trans)) => (rule, trans),
+            _ => return Ok(()),
+        };
 
-            let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
-                Ok(unix_time) => unix_time,
-                Err(Error::OutOfRange(error)) => return Err(Error::TimeZone(error)),
-                Err(err) => return Err(err),
+        let last_local_time_type = &self.local_time_types[last_transition.local_time_type_index];
+        let unix_time = match self.unix_leap_time_to_unix_time(last_transition.unix_leap_time) {
+            Ok(unix_time) => unix_time,
+            Err(Error::OutOfRange(error)) => return Err(Error::TimeZone(error)),
+            Err(err) => return Err(err),
+        };
+
+        let rule_local_time_type = match extra_rule.find_local_time_type(unix_time) {
+            Ok(rule_local_time_type) => rule_local_time_type,
+            Err(Error::OutOfRange(error)) => return Err(Error::TimeZone(error)),
+            Err(err) => return Err(err),
+        };
+
+        let check = last_local_time_type.ut_offset == rule_local_time_type.ut_offset
+            && last_local_time_type.is_dst == rule_local_time_type.is_dst
+            && match (&last_local_time_type.name, &rule_local_time_type.name) {
+                (Some(x), Some(y)) => x.equal(y),
+                (None, None) => true,
+                _ => false,
             };
 
-            let rule_local_time_type = match extra_rule.find_local_time_type(unix_time) {
-                Ok(rule_local_time_type) => rule_local_time_type,
-                Err(Error::OutOfRange(error)) => return Err(Error::TimeZone(error)),
-                Err(err) => return Err(err),
-            };
-
-            let check = last_local_time_type.ut_offset == rule_local_time_type.ut_offset
-                && last_local_time_type.is_dst == rule_local_time_type.is_dst
-                && match (&last_local_time_type.name, &rule_local_time_type.name) {
-                    (Some(x), Some(y)) => x.equal(y),
-                    (None, None) => true,
-                    _ => false,
-                };
-
-            if !check {
-                return Err(Error::TimeZone(
-                    "extra transition rule is inconsistent with the last transition",
-                ));
-            }
+        if !check {
+            return Err(Error::TimeZone(
+                "extra transition rule is inconsistent with the last transition",
+            ));
         }
 
         Ok(())
