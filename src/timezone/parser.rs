@@ -10,16 +10,106 @@ use crate::Error;
 pub(super) fn parse(bytes: &[u8]) -> Result<TimeZone, Error> {
     let mut cursor = Cursor::new(bytes);
     let parser = Parser::new(&mut cursor, true)?;
-    match parser.header.version {
+    let (parser, footer) = match parser.header.version {
         Version::V1 => match cursor.is_empty() {
-            true => parser.parse(None),
-            false => Err(Error::InvalidTzFile("remaining data after end of TZif v1 data block")),
+            true => (parser, None),
+            false => {
+                return Err(Error::InvalidTzFile("remaining data after end of TZif v1 data block"))
+            }
         },
         Version::V2 | Version::V3 => {
             let parser = Parser::new(&mut cursor, false)?;
-            parser.parse(Some(cursor.remaining()))
+            (parser, Some(cursor.remaining()))
+        }
+    };
+
+    let mut transitions = Vec::with_capacity(parser.header.transition_count);
+    for (arr_time, &local_time_type_index) in
+        parser.transition_times.chunks_exact(parser.time_size).zip(parser.transition_types)
+    {
+        let unix_leap_time =
+            parser.parse_time(&arr_time[0..parser.time_size], parser.header.version)?;
+        let local_time_type_index = local_time_type_index as usize;
+        transitions.push(Transition::new(unix_leap_time, local_time_type_index));
+    }
+
+    let mut local_time_types = Vec::with_capacity(parser.header.type_count);
+    for arr in parser.local_time_types.chunks_exact(6) {
+        let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
+
+        let is_dst = match arr[4] {
+            0 => false,
+            1 => true,
+            _ => return Err(Error::InvalidTzFile("invalid DST indicator")),
+        };
+
+        let char_index = arr[5] as usize;
+        if char_index >= parser.header.char_count {
+            return Err(Error::InvalidTzFile("invalid time zone designation char index"));
+        }
+
+        let time_zone_designation = match parser.time_zone_designations[char_index..]
+            .iter()
+            .position(|&c| c == b'\0')
+        {
+            None => return Err(Error::InvalidTzFile("invalid time zone designation char index")),
+            Some(position) => {
+                let time_zone_designation =
+                    &parser.time_zone_designations[char_index..char_index + position];
+
+                if !time_zone_designation.is_empty() {
+                    Some(time_zone_designation)
+                } else {
+                    None
+                }
+            }
+        };
+
+        local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
+    }
+
+    let mut leap_seconds = Vec::with_capacity(parser.header.leap_count);
+    for arr in parser.leap_seconds.chunks_exact(parser.time_size + 4) {
+        let unix_leap_time = parser.parse_time(&arr[0..parser.time_size], parser.header.version)?;
+        let correction =
+            i32::from_be_bytes(arr[parser.time_size..parser.time_size + 4].try_into()?);
+        leap_seconds.push(LeapSecond::new(unix_leap_time, correction));
+    }
+
+    let std_walls_iter = parser.std_walls.iter().copied().chain(iter::repeat(0));
+    let ut_locals_iter = parser.ut_locals.iter().copied().chain(iter::repeat(0));
+    for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(parser.header.type_count) {
+        if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
+            return Err(Error::InvalidTzFile(
+                "invalid couple of standard/wall and UT/local indicators",
+            ));
         }
     }
+
+    let extra_rule = match footer {
+        Some(footer) => {
+            let footer = str::from_utf8(footer)?;
+            if !(footer.starts_with('\n') && footer.ends_with('\n')) {
+                return Err(Error::InvalidTzFile("invalid footer"));
+            }
+
+            let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
+            if tz_string.starts_with(':') || tz_string.contains('\0') {
+                return Err(Error::InvalidTzFile("invalid footer"));
+            }
+
+            match tz_string.is_empty() {
+                true => None,
+                false => Some(TransitionRule::from_tz_string(
+                    tz_string.as_bytes(),
+                    parser.header.version == Version::V3,
+                )?),
+            }
+        }
+        None => None,
+    };
+
+    TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)
 }
 
 /// TZif data blocks
@@ -71,100 +161,6 @@ impl<'a> Parser<'a> {
             Version::V1 => i32::from_be_bytes(arr.try_into()?).into(),
             Version::V2 | Version::V3 => i64::from_be_bytes(arr.try_into()?),
         })
-    }
-
-    /// Parse time zone data
-    fn parse(self, footer: Option<&[u8]>) -> Result<TimeZone, Error> {
-        let mut transitions = Vec::with_capacity(self.header.transition_count);
-        for (arr_time, &local_time_type_index) in
-            self.transition_times.chunks_exact(self.time_size).zip(self.transition_types)
-        {
-            let unix_leap_time =
-                self.parse_time(&arr_time[0..self.time_size], self.header.version)?;
-            let local_time_type_index = local_time_type_index as usize;
-            transitions.push(Transition::new(unix_leap_time, local_time_type_index));
-        }
-
-        let mut local_time_types = Vec::with_capacity(self.header.type_count);
-        for arr in self.local_time_types.chunks_exact(6) {
-            let ut_offset = i32::from_be_bytes(arr[0..4].try_into()?);
-
-            let is_dst = match arr[4] {
-                0 => false,
-                1 => true,
-                _ => return Err(Error::InvalidTzFile("invalid DST indicator")),
-            };
-
-            let char_index = arr[5] as usize;
-            if char_index >= self.header.char_count {
-                return Err(Error::InvalidTzFile("invalid time zone designation char index"));
-            }
-
-            let time_zone_designation = match self.time_zone_designations[char_index..]
-                .iter()
-                .position(|&c| c == b'\0')
-            {
-                None => {
-                    return Err(Error::InvalidTzFile("invalid time zone designation char index"))
-                }
-                Some(position) => {
-                    let time_zone_designation =
-                        &self.time_zone_designations[char_index..char_index + position];
-
-                    if !time_zone_designation.is_empty() {
-                        Some(time_zone_designation)
-                    } else {
-                        None
-                    }
-                }
-            };
-
-            local_time_types.push(LocalTimeType::new(ut_offset, is_dst, time_zone_designation)?);
-        }
-
-        let mut leap_seconds = Vec::with_capacity(self.header.leap_count);
-        for arr in self.leap_seconds.chunks_exact(self.time_size + 4) {
-            let unix_leap_time = self.parse_time(&arr[0..self.time_size], self.header.version)?;
-            let correction =
-                i32::from_be_bytes(arr[self.time_size..self.time_size + 4].try_into()?);
-            leap_seconds.push(LeapSecond::new(unix_leap_time, correction));
-        }
-
-        let std_walls_iter = self.std_walls.iter().copied().chain(iter::repeat(0));
-        let ut_locals_iter = self.ut_locals.iter().copied().chain(iter::repeat(0));
-        for (std_wall, ut_local) in std_walls_iter.zip(ut_locals_iter).take(self.header.type_count)
-        {
-            if !matches!((std_wall, ut_local), (0, 0) | (1, 0) | (1, 1)) {
-                return Err(Error::InvalidTzFile(
-                    "invalid couple of standard/wall and UT/local indicators",
-                ));
-            }
-        }
-
-        let extra_rule = match footer {
-            Some(footer) => {
-                let footer = str::from_utf8(footer)?;
-                if !(footer.starts_with('\n') && footer.ends_with('\n')) {
-                    return Err(Error::InvalidTzFile("invalid footer"));
-                }
-
-                let tz_string = footer.trim_matches(|c: char| c.is_ascii_whitespace());
-                if tz_string.starts_with(':') || tz_string.contains('\0') {
-                    return Err(Error::InvalidTzFile("invalid footer"));
-                }
-
-                match tz_string.is_empty() {
-                    true => None,
-                    false => Some(TransitionRule::from_tz_string(
-                        tz_string.as_bytes(),
-                        self.header.version == Version::V3,
-                    )?),
-                }
-            }
-            None => None,
-        };
-
-        TimeZone::new(transitions, local_time_types, leap_seconds, extra_rule)
     }
 }
 
