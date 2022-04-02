@@ -82,9 +82,9 @@ impl TimeZone {
         leap_seconds: Vec<LeapSecond>,
         extra_rule: Option<TransitionRule>,
     ) -> Result<Self, Error> {
-        TimeZoneRef::new_unchecked(&transitions, &local_time_types, &leap_seconds, &extra_rule)
-            .check_inputs()?;
-        Ok(Self { transitions, local_time_types, leap_seconds, extra_rule })
+        let new = Self { transitions, local_time_types, leap_seconds, extra_rule };
+        new.as_ref().check_inputs()?;
+        Ok(new)
     }
 
     /// Construct a time zone from the contents of a time zone file
@@ -128,12 +128,12 @@ impl TimeZone {
 
     /// Returns a reference to the time zone
     pub fn as_ref(&self) -> TimeZoneRef {
-        TimeZoneRef::new_unchecked(
-            &self.transitions,
-            &self.local_time_types,
-            &self.leap_seconds,
-            &self.extra_rule,
-        )
+        TimeZoneRef {
+            transitions: &self.transitions,
+            local_time_types: &self.local_time_types,
+            leap_seconds: &self.leap_seconds,
+            extra_rule: &self.extra_rule,
+        }
     }
 }
 
@@ -223,16 +223,6 @@ impl<'a> TimeZoneRef<'a> {
             Err(Error::OutOfRange(error)) => Err(Error::FindLocalTimeType(error)),
             err => err,
         }
-    }
-
-    /// Construct a reference to a time zone
-    const fn new_unchecked(
-        transitions: &'a [Transition],
-        local_time_types: &'a [LocalTimeType],
-        leap_seconds: &'a [LeapSecond],
-        extra_rule: &'a Option<TransitionRule>,
-    ) -> Self {
-        Self { transitions, local_time_types, leap_seconds, extra_rule }
     }
 
     /// Check time zone inputs
