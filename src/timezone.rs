@@ -6,10 +6,8 @@ use std::path::{Path, PathBuf};
 use std::{fmt, str};
 
 use super::{Error, DAYS_PER_WEEK, SECONDS_PER_DAY};
-
-mod parser;
-mod rule;
-use rule::{AlternateTime, TransitionRule};
+use crate::parser;
+use crate::rule::{AlternateTime, TransitionRule};
 
 /// Time zone
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -73,7 +71,7 @@ impl TimeZone {
     }
 
     /// Construct a time zone
-    fn new(
+    pub(crate) fn new(
         transitions: Vec<Transition>,
         local_time_types: Vec<LocalTimeType>,
         leap_seconds: Vec<LeapSecond>,
@@ -483,7 +481,7 @@ impl fmt::Debug for TzAsciiStr {
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct LocalTimeType {
     /// Offset from UTC in seconds
-    ut_offset: i32,
+    pub(crate) ut_offset: i32,
     /// Daylight Saving Time indicator
     is_dst: bool,
     /// Time zone designation
@@ -492,7 +490,7 @@ pub struct LocalTimeType {
 
 impl LocalTimeType {
     /// Construct a local time type
-    pub fn new(
+    pub(crate) fn new(
         ut_offset: i32,
         is_dst: bool,
         time_zone_designation: Option<&[u8]>,
@@ -574,7 +572,7 @@ const ZONE_INFO_DIRECTORIES: [&str; 3] =
     ["/usr/share/zoneinfo", "/share/zoneinfo", "/etc/zoneinfo"];
 
 /// Number of seconds in one week
-const SECONDS_PER_WEEK: i64 = SECONDS_PER_DAY * DAYS_PER_WEEK;
+pub(crate) const SECONDS_PER_WEEK: i64 = SECONDS_PER_DAY * DAYS_PER_WEEK;
 /// Number of seconds in 28 days
 const SECONDS_PER_28_DAYS: i64 = SECONDS_PER_DAY * 28;
 

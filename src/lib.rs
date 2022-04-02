@@ -140,6 +140,9 @@ pub use datetime::{DateTime, UtcDateTime};
 mod timezone;
 pub use timezone::{TimeZone, TimeZoneRef};
 
+mod parser;
+mod rule;
+
 /// Unified error type for everything in the crate
 #[non_exhaustive]
 #[derive(Debug)]

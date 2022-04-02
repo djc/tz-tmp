@@ -4,7 +4,8 @@ use std::iter;
 use std::num::ParseIntError;
 use std::str::{self, FromStr};
 
-use super::{LeapSecond, LocalTimeType, TimeZone, Transition, TransitionRule};
+use crate::rule::TransitionRule;
+use crate::timezone::{LeapSecond, LocalTimeType, TimeZone, Transition};
 use crate::Error;
 
 pub(super) fn parse(bytes: &[u8]) -> Result<TimeZone, Error> {

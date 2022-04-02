@@ -1,8 +1,8 @@
 use std::cmp::Ordering;
 
 use super::parser::Cursor;
-use super::{LocalTimeType, SECONDS_PER_WEEK};
 use crate::datetime::{days_since_unix_epoch, is_leap_year, UtcDateTime};
+use crate::timezone::{LocalTimeType, SECONDS_PER_WEEK};
 use crate::{
     Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
     SECONDS_PER_DAY,
@@ -475,8 +475,8 @@ impl RuleDay {
 
 #[cfg(test)]
 mod tests {
-    use super::super::Transition;
     use super::{AlternateTime, LocalTimeType, RuleDay, TransitionRule};
+    use crate::timezone::Transition;
     use crate::{Error, TimeZone};
 
     #[test]
