@@ -6,8 +6,8 @@ use std::time::SystemTime;
 
 use crate::timezone::{LocalTimeType, TimeZoneRef};
 use crate::{
-    rem_euclid, Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAYS_PER_WEEK, DAY_IN_MONTHS_NORMAL_YEAR,
-    HOURS_PER_DAY, SECONDS_PER_DAY, SECONDS_PER_HOUR,
+    Error, CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, DAY_IN_MONTHS_NORMAL_YEAR, HOURS_PER_DAY,
+    SECONDS_PER_DAY, SECONDS_PER_HOUR,
 };
 
 /// Date time associated to a local time type, exprimed in the [proleptic gregorian calendar](https://en.wikipedia.org/wiki/Proleptic_Gregorian_calendar)
@@ -46,8 +46,7 @@ impl DateTime {
             Err(err) => return Err(err),
         };
 
-        let unix_time_with_offset = match unix_time.checked_add(local_time_type.offset() as i64)
-        {
+        let unix_time_with_offset = match unix_time.checked_add(local_time_type.offset() as i64) {
             Some(unix_time_with_offset) => unix_time_with_offset,
             None => return Err(Error::ProjectDateTime("out of range date time")),
         };
@@ -72,20 +71,6 @@ impl DateTime {
             unix_time,
             nanoseconds,
         })
-    }
-
-    /// Construct a date time from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`) and a time zone
-    pub fn from_total_nanoseconds(
-        total_nanoseconds: i128,
-        time_zone_ref: TimeZoneRef,
-    ) -> Result<Self, Error> {
-        match total_nanoseconds_to_timespec(total_nanoseconds) {
-            Ok((unix_time, nanoseconds)) => {
-                Self::from_timespec(unix_time, nanoseconds, time_zone_ref)
-            }
-            Err(Error::OutOfRange(error)) => Err(Error::ProjectDateTime(error)),
-            Err(err) => Err(err),
-        }
     }
 
     /// Returns the current date time associated to the specified time zone
@@ -140,21 +125,6 @@ impl DateTime {
     /// Returns nanoseconds in `[0, 999_999_999]`
     pub fn nanoseconds(&self) -> u32 {
         self.nanoseconds
-    }
-
-    /// Returns days since Sunday in `[0, 6]`
-    pub fn week_day(&self) -> u8 {
-        week_day(self.year, self.month as usize, self.month_day as i64)
-    }
-
-    /// Returns days since January 1 in `[0, 365]`
-    pub fn year_day(&self) -> u16 {
-        year_day(self.year, self.month as usize, self.month_day as i64)
-    }
-
-    /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-    pub fn total_nanoseconds(&self) -> i128 {
-        nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
     }
 
     /// Returns local time type
@@ -355,19 +325,6 @@ impl UtcDateTime {
         })
     }
 
-    /// Returns the current UTC date time
-    pub fn now() -> Result<Self, Error> {
-        let now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-
-        let seconds = now.as_secs();
-        let seconds = match seconds <= i64::max_value() as u64 {
-            true => seconds as i64,
-            false => return Err(Error::OutOfRange("u64 out of range for i64")),
-        };
-
-        Self::from_timespec(seconds, now.subsec_nanos())
-    }
-
     /// Returns the Unix time in seconds associated to the UTC date time
     pub fn unix_time(&self) -> i64 {
         let mut result =
@@ -423,21 +380,6 @@ impl UtcDateTime {
     pub fn nanoseconds(&self) -> u32 {
         self.nanoseconds
     }
-
-    /// Returns days since Sunday in `[0, 6]`
-    pub fn week_day(&self) -> u8 {
-        week_day(self.year, self.month as usize, self.month_day as i64)
-    }
-
-    /// Returns days since January 1 in `[0, 365]`
-    pub fn year_day(&self) -> u16 {
-        year_day(self.year, self.month as usize, self.month_day as i64)
-    }
-
-    /// Returns total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-    pub fn total_nanoseconds(&self) -> i128 {
-        nanoseconds_since_unix_epoch(self.unix_time(), self.nanoseconds)
-    }
 }
 
 impl fmt::Display for UtcDateTime {
@@ -454,30 +396,6 @@ impl fmt::Display for UtcDateTime {
             0,
         )
     }
-}
-
-/// Compute the number of days since Sunday in `[0, 6]`
-///
-/// ## Inputs
-///
-/// * `year`: Year
-/// * `month`: Month in `[1, 12]`
-/// * `month_day`: Day of the month in `[1, 31]`
-fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
-    let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
-    rem_euclid(4 + days_since_unix_epoch, DAYS_PER_WEEK) as u8
-}
-
-/// Compute the number of days since January 1 in `[0, 365]`
-///
-/// ## Inputs
-///
-/// * `year`: Year
-/// * `month`: Month in `[1, 12]`
-/// * `month_day`: Day of the month in `[1, 31]`
-fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
-    let leap = (month >= 3 && is_leap_year(year)) as i64;
-    (CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1] + leap + month_day - 1) as u16
 }
 
 /// Check if a year is a leap year
@@ -520,55 +438,6 @@ pub(crate) fn days_since_unix_epoch(year: i32, month: usize, month_day: i64) -> 
     result += CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1] + month_day - 1;
 
     result
-}
-
-/// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
-    // Overflow is not possible
-    unix_time as i128 * NANOSECONDS_PER_SECOND as i128 + nanoseconds as i128
-}
-
-/// Compute Unix time in seconds with nanoseconds from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
-///
-/// ## Outputs
-///
-/// * `unix_time`: Unix time in seconds
-/// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
-fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), Error> {
-    let seconds = div_euclid(total_nanoseconds, NANOSECONDS_PER_SECOND as i128);
-    let unix_time = match seconds >= i64::min_value() as i128 && seconds <= i64::max_value() as i128
-    {
-        true => seconds as i64,
-        false => return Err(Error::OutOfRange("cannot convert i128 to i64")),
-    };
-
-    let nanoseconds = rem_euclid_i128(total_nanoseconds, NANOSECONDS_PER_SECOND as i128) as u32;
-    Ok((unix_time, nanoseconds))
-}
-
-// MSRV: 1.38
-#[inline]
-fn div_euclid(v: i128, rhs: i128) -> i128 {
-    let q = v / rhs;
-    if v % rhs < 0 {
-        return if rhs > 0 { q - 1 } else { q + 1 };
-    }
-    q
-}
-
-// MSRV: 1.38
-#[inline]
-fn rem_euclid_i128(v: i128, rhs: i128) -> i128 {
-    let r = v % rhs;
-    if r < 0 {
-        if rhs < 0 {
-            r - rhs
-        } else {
-            r + rhs
-        }
-    } else {
-        r
-    }
 }
 
 /// Format a date time
@@ -650,11 +519,11 @@ mod test {
     use std::cmp::Ordering;
 
     use super::{
-        days_since_unix_epoch, is_leap_year, nanoseconds_since_unix_epoch,
-        total_nanoseconds_to_timespec, week_day, year_day, DateTime, UtcDateTime,
+        days_since_unix_epoch, is_leap_year, DateTime, UtcDateTime,
+        CUMUL_DAY_IN_MONTHS_NORMAL_YEAR, NANOSECONDS_PER_SECOND,
     };
     use crate::timezone::{LocalTimeType, TimeZone};
-    use crate::{matches, Error};
+    use crate::{matches, rem_euclid, Error, DAYS_PER_WEEK};
 
     fn check_equal_date_time(x: &DateTime, y: &DateTime) {
         assert_eq!(x.year(), y.year());
@@ -1152,6 +1021,12 @@ mod test {
         assert_eq!(nanoseconds_since_unix_epoch(-2, 1000), -1_999_999_000);
     }
 
+    /// Compute the number of nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    fn nanoseconds_since_unix_epoch(unix_time: i64, nanoseconds: u32) -> i128 {
+        // Overflow is not possible
+        unix_time as i128 * NANOSECONDS_PER_SECOND as i128 + nanoseconds as i128
+    }
+
     #[test]
     fn test_total_nanoseconds_to_timespec() -> Result<(), Error> {
         assert!(matches!(total_nanoseconds_to_timespec(1_000_001_000), Ok((1, 1000))));
@@ -1189,5 +1064,72 @@ mod test {
         ));
 
         Ok(())
+    }
+
+    /// Compute Unix time in seconds with nanoseconds from total nanoseconds since Unix epoch (`1970-01-01T00:00:00Z`)
+    ///
+    /// ## Outputs
+    ///
+    /// * `unix_time`: Unix time in seconds
+    /// * `nanoseconds`: Nanoseconds in `[0, 999_999_999]`
+    fn total_nanoseconds_to_timespec(total_nanoseconds: i128) -> Result<(i64, u32), Error> {
+        let seconds = div_euclid(total_nanoseconds, NANOSECONDS_PER_SECOND as i128);
+        let unix_time =
+            match seconds >= i64::min_value() as i128 && seconds <= i64::max_value() as i128 {
+                true => seconds as i64,
+                false => return Err(Error::OutOfRange("cannot convert i128 to i64")),
+            };
+
+        let nanoseconds = rem_euclid_i128(total_nanoseconds, NANOSECONDS_PER_SECOND as i128) as u32;
+        Ok((unix_time, nanoseconds))
+    }
+
+    /// Compute the number of days since Sunday in `[0, 6]`
+    ///
+    /// ## Inputs
+    ///
+    /// * `year`: Year
+    /// * `month`: Month in `[1, 12]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    fn week_day(year: i32, month: usize, month_day: i64) -> u8 {
+        let days_since_unix_epoch = days_since_unix_epoch(year, month, month_day);
+        rem_euclid(4 + days_since_unix_epoch, DAYS_PER_WEEK) as u8
+    }
+
+    /// Compute the number of days since January 1 in `[0, 365]`
+    ///
+    /// ## Inputs
+    ///
+    /// * `year`: Year
+    /// * `month`: Month in `[1, 12]`
+    /// * `month_day`: Day of the month in `[1, 31]`
+    fn year_day(year: i32, month: usize, month_day: i64) -> u16 {
+        let leap = (month >= 3 && is_leap_year(year)) as i64;
+        (CUMUL_DAY_IN_MONTHS_NORMAL_YEAR[month - 1] + leap + month_day - 1) as u16
+    }
+
+    // MSRV: 1.38
+    #[inline]
+    fn div_euclid(v: i128, rhs: i128) -> i128 {
+        let q = v / rhs;
+        if v % rhs < 0 {
+            return if rhs > 0 { q - 1 } else { q + 1 };
+        }
+        q
+    }
+
+    // MSRV: 1.38
+    #[inline]
+    fn rem_euclid_i128(v: i128, rhs: i128) -> i128 {
+        let r = v % rhs;
+        if r < 0 {
+            if rhs < 0 {
+                r - rhs
+            } else {
+                r + rhs
+            }
+        } else {
+            r
+        }
     }
 }

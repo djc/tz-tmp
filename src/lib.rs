@@ -61,11 +61,17 @@
 //! ## Date time
 //!
 //! ```rust
+//! # use std::time::SystemTime;
 //! # fn main() -> Result<(), tz::Error> {
 //! use tz::{DateTime, TimeZone, UtcDateTime};
 //!
 //! // Get the current UTC date time
-//! let _current_utc_date_time = UtcDateTime::now()?;
+//! let unix_now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
+//! let unix_now = match unix_now < i64::max_value() as u64 {
+//!     true => unix_now as i64,
+//!     false => return Err(tz::Error::OutOfRange("u64 out of range for i64")),
+//! };
+//! let _current_utc_date_time = UtcDateTime::from_timespec(unix_now, 0)?;
 //!
 //! // Create a new UTC date time (2000-01-01T00:00:00.123456789Z)
 //! let utc_date_time = UtcDateTime::new(2000, 1, 1, 0, 0, 0, 123_456_789)?;
@@ -75,8 +81,6 @@
 //! assert_eq!(utc_date_time.hour(), 0);
 //! assert_eq!(utc_date_time.minute(), 0);
 //! assert_eq!(utc_date_time.second(), 0);
-//! assert_eq!(utc_date_time.week_day(), 6);
-//! assert_eq!(utc_date_time.year_day(), 0);
 //! assert_eq!(utc_date_time.unix_time(), 946684800);
 //! assert_eq!(utc_date_time.nanoseconds(), 123_456_789);
 //! assert_eq!(utc_date_time.to_string(), "2000-01-01T00:00:00.123456789Z");
@@ -93,8 +97,6 @@
 //! assert_eq!(date_time.hour(), 23);
 //! assert_eq!(date_time.minute(), 0);
 //! assert_eq!(date_time.second(), 0);
-//! assert_eq!(date_time.week_day(), 5);
-//! assert_eq!(date_time.year_day(), 364);
 //! assert_eq!(date_time.local_time_type().offset(), -3600);
 //! assert_eq!(date_time.unix_time(), 946684800);
 //! assert_eq!(date_time.nanoseconds(), 123_456_789);
@@ -108,8 +110,6 @@
 //! assert_eq!(other_date_time.hour(), 1);
 //! assert_eq!(other_date_time.minute(), 0);
 //! assert_eq!(other_date_time.second(), 0);
-//! assert_eq!(other_date_time.week_day(), 6);
-//! assert_eq!(other_date_time.year_day(), 0);
 //! assert_eq!(other_date_time.local_time_type().offset(), 3600);
 //! assert_eq!(other_date_time.unix_time(), 946684800);
 //! assert_eq!(other_date_time.nanoseconds(), 123_456_789);

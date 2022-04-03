@@ -49,7 +49,13 @@ fn main() -> Result<(), Error> {
     //
 
     // Get the current UTC date time
-    let current_utc_date_time = UtcDateTime::now()?;
+    let unix_now = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_secs();
+    let unix_now = match unix_now <= i64::max_value() as u64 {
+        true => unix_now as i64,
+        false => return Err(Error::OutOfRange("u64 out of range for i64")),
+    };
+
+    let current_utc_date_time = UtcDateTime::from_timespec(unix_now, 0)?;
     println!("{:?}", current_utc_date_time);
 
     // Create a new UTC date time (2000-01-01T00:00:00.123456789Z)
@@ -87,7 +93,6 @@ fn main() -> Result<(), Error> {
     // Nanoseconds are always added towards the future
     let neg_utc_date_time = UtcDateTime::from_timespec(-1, 123_456_789)?;
     println!("{}", neg_utc_date_time);
-    println!("{}", neg_utc_date_time.total_nanoseconds());
 
     // Get the current date time at the local time zone (UNIX only)
     let time_zone_local = TimeZone::local()?;
